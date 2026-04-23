@@ -6,8 +6,8 @@ const options = {}
 let client: MongoClient
 let clientPromise: Promise<MongoClient>
 
-if (!process.env.DATABASE_URL) {
-  throw new Error('Please add your Mongo URI to .env.local')
+if (!process.env.DATABASE_URL && process.env.NODE_ENV === 'production' && typeof window === 'undefined') {
+  console.warn('WARNING: DATABASE_URL is missing. Database connections will fail at runtime.')
 }
 
 if (process.env.NODE_ENV === 'development') {
