@@ -1,0 +1,22 @@
+{
+  "agent_name": "KB Assistant",
+  "agent_id": "69e8fd92bb1a2df4e7d39aee",
+  "description": "A knowledge base Q&A assistant that answers questions based on uploaded documents",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "answer": "string",
+    "sources": [
+      "string"
+    ],
+    "confidence": "string"
+  },
+  "example_response": {
+    "answer": "The answer based on knowledge base documents",
+    "sources": [
+      "sample string"
+    ],
+    "confidence": "Confidence level of the answer"
+  }
+}

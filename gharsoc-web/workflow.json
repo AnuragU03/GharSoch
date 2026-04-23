@@ -1,0 +1,90 @@
+{
+  "workflow": {
+    "nodes": [
+      {"id": "input_node", "type": "Input", "label": "Inbound Call / CRM Webhook", "nodeCategory": "input"},
+      {"id": "manager_agent", "type": "Agent", "label": "Voice Orchestrator", "nodeCategory": "agent", "agent_id": "69e8f73cd8820b5d0188ed99"},
+      {"id": "lead_agent", "type": "Agent", "label": "Lead Qualification", "nodeCategory": "agent", "agent_id": "69e8f707f89cad5d4b752d22"},
+      {"id": "financial_agent", "type": "Agent", "label": "Financial Advisory", "nodeCategory": "agent", "agent_id": "69e8f7086aa016932b1c1a83"},
+      {"id": "property_agent", "type": "Agent", "label": "Property Search", "nodeCategory": "agent", "agent_id": "69e8f709d2531e39b8b15889"},
+      {"id": "calendar_agent", "type": "Agent", "label": "Calendar Scheduling", "nodeCategory": "agent", "agent_id": "69e8f71ed8820b5d0188ed95"},
+      {"id": "sync_agent", "type": "Agent", "label": "Post-Call Sync", "nodeCategory": "agent", "agent_id": "69e8f709f89cad5d4b752d24"},
+      {"id": "reengagement_agent", "type": "Agent", "label": "Re-engagement", "nodeCategory": "agent", "agent_id": "69e8f70a86926aed0100ba92"},
+      {"id": "selfservice_agent", "type": "Agent", "label": "Self-Service Advisor", "nodeCategory": "agent", "agent_id": "69e8f709f89cad5d4b752d26"},
+      {"id": "output_node", "type": "Output", "label": "Output", "nodeCategory": "end"}
+    ],
+    "edges": [
+      {"source": "input_node", "target": "manager_agent"},
+      {"source": "manager_agent", "target": "lead_agent"},
+      {"source": "manager_agent", "target": "financial_agent"},
+      {"source": "manager_agent", "target": "property_agent"},
+      {"source": "manager_agent", "target": "calendar_agent"},
+      {"source": "manager_agent", "target": "sync_agent"},
+      {"source": "sync_agent", "target": "reengagement_agent"},
+      {"source": "reengagement_agent", "target": "selfservice_agent"},
+      {"source": "selfservice_agent", "target": "output_node"}
+    ]
+  },
+  "agents": {
+    "voice_orchestrator": {
+      "agent_id": "69e8f73cd8820b5d0188ed99",
+      "name": "Voice Conversation Orchestrator",
+      "type": "voice",
+      "provider": "openai",
+      "model": "gpt-4.1",
+      "managed_agents": ["69e8f707f89cad5d4b752d22", "69e8f7086aa016932b1c1a83", "69e8f709d2531e39b8b15889", "69e8f71ed8820b5d0188ed95"]
+    },
+    "lead_qualification": {
+      "agent_id": "69e8f707f89cad5d4b752d22",
+      "name": "Lead Qualification & Objection Agent",
+      "type": "json",
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6"
+    },
+    "financial_advisory": {
+      "agent_id": "69e8f7086aa016932b1c1a83",
+      "name": "GharSoch Financial Advisory Agent",
+      "type": "json",
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6"
+    },
+    "property_search": {
+      "agent_id": "69e8f709d2531e39b8b15889",
+      "name": "Property Search Agent",
+      "type": "json",
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6",
+      "has_knowledge_base": true
+    },
+    "calendar_scheduling": {
+      "agent_id": "69e8f71ed8820b5d0188ed95",
+      "name": "Calendar Scheduling Agent",
+      "type": "json",
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6",
+      "tools": ["GOOGLECALENDAR_FIND_FREE_SLOTS", "GOOGLECALENDAR_CREATE_EVENT", "GOOGLECALENDAR_LIST_EVENTS"]
+    },
+    "post_call_sync": {
+      "agent_id": "69e8f709f89cad5d4b752d24",
+      "name": "Post-Call Sync Agent",
+      "type": "json",
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6"
+    },
+    "reengagement": {
+      "agent_id": "69e8f70a86926aed0100ba92",
+      "name": "Property Re-engagement Agent",
+      "type": "json",
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6",
+      "has_knowledge_base": true,
+      "scheduled": true
+    },
+    "self_service": {
+      "agent_id": "69e8f709f89cad5d4b752d26",
+      "name": "GharSoch Self-Service Advisor",
+      "type": "json",
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6"
+    }
+  }
+}

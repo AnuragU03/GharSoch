@@ -1,0 +1,43 @@
+{
+  "app_name": "KnowledgeBase MVP Demo",
+  "agents": [
+    {
+      "agent_id": "69e8fd92bb1a2df4e7d39aee",
+      "name": "KB Assistant",
+      "description": "A knowledge base Q&A assistant that answers questions based on uploaded documents",
+      "model": "gpt-4.1",
+      "provider": "openai",
+      "temperature": 0.3,
+      "top_p": 0.9,
+      "has_knowledge_base": true,
+      "rag_id": "69e8fd87aa9f34bdaf6dce23",
+      "rag_name": "demoknowledgebasemgc8"
+    }
+  ],
+  "agent_ids": {
+    "kb_assistant": "69e8fd92bb1a2df4e7d39aee"
+  },
+  "rag_ids": {
+    "demo_knowledge_base": "69e8fd87aa9f34bdaf6dce23",
+    "demo_knowledge_base_name": "demoknowledgebasemgc8"
+  },
+  "knowledge_bases": [
+    {
+      "rag_id": "69e8fd87aa9f34bdaf6dce23",
+      "rag_name": "demoknowledgebasemgc8",
+      "name": "demo_knowledge_base",
+      "description": "Demo knowledge base for MVP - stores uploaded documents for Q&A"
+    }
+  ],
+  "workflow": {
+    "nodes": [
+      {"id": "input_node", "type": "Input", "label": "User Question", "nodeCategory": "input"},
+      {"id": "kb_assistant_agent", "type": "Agent", "label": "KB Assistant", "nodeCategory": "agent"},
+      {"id": "output_node", "type": "Output", "label": "KB Response", "nodeCategory": "end"}
+    ],
+    "edges": [
+      {"source": "input_node", "target": "kb_assistant_agent"},
+      {"source": "kb_assistant_agent", "target": "output_node"}
+    ]
+  }
+}

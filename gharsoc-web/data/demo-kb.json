@@ -1,0 +1,110 @@
+{
+  "listings": [
+    {
+      "id": "blr-prestige-lakeside-3bhk",
+      "city": "Bangalore",
+      "locality": "Whitefield",
+      "builder": "Prestige",
+      "project": "Prestige Lakeside Habitat",
+      "property_type": "Apartment",
+      "config": "3 BHK",
+      "status": "ReadyToMove",
+      "price_inr": 15500000,
+      "area_sqft": 1655,
+      "hoa_inr_per_month": 5500,
+      "amenities": ["clubhouse", "pool", "gym", "security", "children_play_area"],
+      "highlights": [
+        "Large integrated township",
+        "Strong resale demand in Whitefield micro-market"
+      ],
+      "nearby": ["ITPL", "Whitefield Metro", "International schools"],
+      "notes": "Typical negotiation band 2–5% depending on inventory."
+    },
+    {
+      "id": "blr-godrej-ananda-2bhk",
+      "city": "Bangalore",
+      "locality": "Aerospace Park (North Bangalore)",
+      "builder": "Godrej",
+      "project": "Godrej Ananda",
+      "property_type": "Apartment",
+      "config": "2 BHK",
+      "status": "UnderConstruction",
+      "price_inr": 9800000,
+      "area_sqft": 1100,
+      "hoa_inr_per_month": 4200,
+      "amenities": ["clubhouse", "pool", "co-working", "security"],
+      "highlights": [
+        "North Bangalore growth corridor",
+        "Good for long-term appreciation near airport"
+      ],
+      "nearby": ["Kempegowda International Airport", "Hebbal flyover"],
+      "notes": "Payment plan varies by tower; confirm tranche schedule."
+    },
+    {
+      "id": "ggn-dlf-garden-city-3bhk",
+      "city": "Gurgaon",
+      "locality": "Sector 91",
+      "builder": "DLF",
+      "project": "DLF Garden City",
+      "property_type": "Apartment",
+      "config": "3 BHK",
+      "status": "ReadyToMove",
+      "price_inr": 18500000,
+      "area_sqft": 1750,
+      "hoa_inr_per_month": 6500,
+      "amenities": ["clubhouse", "security", "power_backup", "parking"],
+      "highlights": ["DLF brand premium", "Family-friendly community"],
+      "nearby": ["Dwarka Expressway", "NH-48"],
+      "notes": "Check maintenance escalation clauses in society bylaws."
+    },
+    {
+      "id": "mum-lodha-powai-2bhk",
+      "city": "Mumbai",
+      "locality": "Powai",
+      "builder": "Lodha",
+      "project": "Lodha Powai",
+      "property_type": "Apartment",
+      "config": "2 BHK",
+      "status": "UnderConstruction",
+      "price_inr": 26500000,
+      "area_sqft": 860,
+      "hoa_inr_per_month": 8000,
+      "amenities": ["clubhouse", "pool", "security", "concierge"],
+      "highlights": ["Premium Powai catchment", "Strong rental demand"],
+      "nearby": ["Hiranandani Gardens", "JVLR"],
+      "notes": "Mumbai deals depend heavily on carpet area and view premium."
+    }
+  ],
+  "project_briefs": [
+    {
+      "id": "brief-prestige-lakeside",
+      "title": "Prestige Lakeside Habitat — quick brief",
+      "content": "Integrated township in Whitefield with strong amenities. Common buyer questions: maintenance/HOA, school access, commute to ITPL, resale liquidity. Typical objections: 'too far', 'maintenance high', 'waiting for spouse approval'."
+    },
+    {
+      "id": "brief-godrej-ananda",
+      "title": "Godrej Ananda — quick brief",
+      "content": "North Bangalore near Aerospace Park corridor. Good for long-term horizon. Common questions: possession timeline, tranche payment plan, pre-EMI impact. Objections: 'airport area is too early', 'traffic'."
+    }
+  ],
+  "playbooks": [
+    {
+      "id": "playbook-spousal-objection",
+      "title": "Spousal objection handling",
+      "content": "Acknowledge decision-making. Offer a joint call slot. Summarize top 3 pros aligned to their priorities. Confirm next step: schedule a 10–15 min joint call or a site visit."
+    },
+    {
+      "id": "playbook-price-objection",
+      "title": "Pricing objection handling",
+      "content": "Reframe to monthly outflow + value. Offer alternatives in same locality or adjacent micro-market. Ask if budget is fixed or flexible for the right project."
+    }
+  ],
+  "compliance": [
+    {
+      "id": "tcpa-consent",
+      "title": "Consent & opt-out",
+      "content": "Capture explicit consent to contact for future matching properties. If user says STOP/QUIT/CANCEL, immediately mark Do-Not-Call and end outreach."
+    }
+  ]
+}
+

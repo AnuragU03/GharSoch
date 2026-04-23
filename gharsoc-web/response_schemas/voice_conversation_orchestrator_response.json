@@ -1,0 +1,8 @@
+{
+  "agent_name": "Voice Conversation Orchestrator",
+  "agent_id": "69e8f73cd8820b5d0188ed99",
+  "description": "Coordinates live voice calls - routes buyer intent to specialist sub-agents, manages conversational state, escalation logic, voicemail branching, TCPA compliance",
+  "agent_type": "voice",
+  "accessor": "websocket",
+  "auto_generated": true
+}
