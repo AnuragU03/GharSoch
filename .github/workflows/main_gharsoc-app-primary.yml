@@ -36,7 +36,11 @@ jobs:
       - name: Zip artifact for deployment
         run: |
           cd ${{ env.PROJECT_PATH }}
-          zip -r ../release.zip . -x "node_modules/*" ".git/*" ".next/cache/*"
+          # Copy static and public files into the standalone folder
+          cp -r public .next/standalone/public
+          cp -r .next/static .next/standalone/.next/static
+          cd .next/standalone
+          zip -r ../../release.zip .
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
