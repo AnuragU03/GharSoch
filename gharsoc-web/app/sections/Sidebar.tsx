@@ -32,7 +32,7 @@ export default function Sidebar({ activeScreen, onNavigate }: SidebarProps) {
           </div>
           <div>
             <h1 className="text-white font-bold text-lg leading-tight font-sans">GharSoch</h1>
-            <p className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>RealVoice AI Platform</p>
+            <p className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>RealVoice Agent Platform</p>
           </div>
         </div>
       </div>

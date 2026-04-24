@@ -20,7 +20,6 @@ const SELF_SERVICE_AGENT_ID = '69e8f709f89cad5d4b752d26'
 interface HomeTruthProps {
   activeAgentId: string | null
   setActiveAgentId: (id: string | null) => void
-  sampleMode: boolean
 }
 
 function renderMarkdown(text: string) {
@@ -46,37 +45,7 @@ function formatInline(text: string) {
   return parts.map((part, i) => i % 2 === 1 ? <strong key={i} className="font-semibold">{part}</strong> : part)
 }
 
-const SAMPLE_RESULT = {
-  propertyName: 'Prestige Lakeside Habitat',
-  location: 'Whitefield, Bangalore',
-  builderScore: 8.5,
-  reraStatus: 'Compliant',
-  legalStatus: 'Clear',
-  constructionProgress: '78%',
-  pricePerSqft: 7200,
-  marketAvgPrice: 6800,
-  priceVerdict: 'Slightly Overpriced',
-  locationScore: 8.2,
-  connectivity: 'Metro 1.2km, Airport 28km, IT Hub 3km',
-  amenities: 'Schools (3), Hospitals (2), Malls (2), Parks (4)',
-  upcomingInfra: 'Purple Line Metro Extension (2026), Peripheral Ring Road',
-  pros: [
-    'Reputed builder with strong track record',
-    'RERA compliant with all approvals in place',
-    'Good connectivity to IT corridors',
-    'Premium amenities and clubhouse',
-    'Appreciation potential due to metro extension',
-  ],
-  cons: [
-    'Slightly above market average pricing',
-    'Traffic congestion during peak hours',
-    'Limited parking for visitors',
-    'Some phases still under construction',
-  ],
-  recommendation: 'This property is a **solid investment** for end-users looking for long-term value. The builder reputation and upcoming metro connectivity justify the premium. However, negotiate for a **3-5% discount** on the listed price. Best suited for IT professionals working in Whitefield/ITPL corridor.',
-}
-
-export default function HomeTruthSection({ activeAgentId, setActiveAgentId, sampleMode }: HomeTruthProps) {
+export default function HomeTruthSection({ activeAgentId, setActiveAgentId }: HomeTruthProps) {
   const [formData, setFormData] = useState({
     propertyName: '',
     location: '',
@@ -89,7 +58,7 @@ export default function HomeTruthSection({ activeAgentId, setActiveAgentId, samp
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState('overview')
 
-  const displayData = sampleMode && !result ? SAMPLE_RESULT : result
+  const displayData = result
 
   const handleSearch = async () => {
     if (!formData.propertyName) {
@@ -132,7 +101,7 @@ export default function HomeTruthSection({ activeAgentId, setActiveAgentId, samp
           <FiHome className="w-6 h-6" style={{ color: 'hsl(25, 70%, 45%)' }} />
           HomeTruth
         </h2>
-        <p className="text-sm text-muted-foreground mt-1">Honest, AI-powered property verification and assessment</p>
+        <p className="text-sm text-muted-foreground mt-1">Honest, Agent-powered property verification and assessment</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
@@ -182,9 +151,7 @@ export default function HomeTruthSection({ activeAgentId, setActiveAgentId, samp
 
             {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
 
-            {sampleMode && !result && (
-              <p className="text-[11px] text-muted-foreground/60 text-center italic">Sample data shown. Search to get live results.</p>
-            )}
+
           </CardContent>
         </Card>
 
@@ -196,7 +163,7 @@ export default function HomeTruthSection({ activeAgentId, setActiveAgentId, samp
             {!displayData && !loading && (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <FiShield className="w-12 h-12 text-muted-foreground/30 mb-3" />
-                <p className="text-sm text-muted-foreground">Enter a property name to get an honest, AI-powered assessment.</p>
+                <p className="text-sm text-muted-foreground">Enter a property name to get an honest, Agent-powered assessment.</p>
               </div>
             )}
 

@@ -30,7 +30,7 @@ const AGENTS_CONFIG = [
 ]
 
 export default function SettingsSection() {
-  const [greeting, setGreeting] = useState('Welcome to GharSoch. I am your AI real estate financial advisor. How can I help you today?')
+  const [greeting, setGreeting] = useState('Welcome to GharSoch. I am your real estate financial advisor. How can I help you today?')
   const [voicemailScript, setVoicemailScript] = useState('Thank you for calling GharSoch. Please leave your name and number.')
   const [notifEmail, setNotifEmail] = useState(true)
   const [notifEscalation, setNotifEscalation] = useState(true)

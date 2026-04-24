@@ -1,88 +1,107 @@
-import { NextRequest, NextResponse } from 'next/server'
-import OpenAI from 'openai'
-import { getAgentConfig } from '@/lib/agentRegistry'
-import { getCollection } from '@/lib/mongodb'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
-})
+import { NextRequest, NextResponse } from 'next/server';
+import { checkAvailability, createEvent } from '@/lib/googleCalendar';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { message, call, type } = body
+    const payload = await request.json();
 
-    console.log('[Vapi/Webhook] Received:', type)
-
-    // Handle different Vapi event types
-    if (type === 'conversation-update') {
-      // Logic for real-time monitoring? 
-    }
-
-    if (type === 'tool-call') {
-      const { toolCalls } = body
-      const results: any[] = []
+    // Vapi sends various message types. We specifically want to intercept 'tool-calls'
+    if (payload.message?.type === 'tool-calls') {
+      const toolCalls = payload.message.toolCalls;
+      const results: any[] = [];
 
       for (const toolCall of toolCalls) {
-        const { function: fn, id } = toolCall
-        const args = JSON.parse(fn.arguments || '{}')
+        const { function: fn, id: toolCallId } = toolCall;
+        const args = typeof fn.arguments === 'string' ? JSON.parse(fn.arguments) : fn.arguments;
 
-        console.log(`[Vapi/Tool] Calling: ${fn.name}`, args)
+        console.log(`[VAPI Webhook] Tool Called: ${fn.name}`, args);
 
-        let result = {}
-        
-        // Tool Routing Logic
-        if (fn.name === 'analyze_affordability') {
-          const config = getAgentConfig('69e8f7086aa016932b1c1a83') // Financial Agent
-          const completion = await openai.chat.completions.create({
-            model: 'gpt-4o',
-            messages: [
-              { role: 'system', content: config?.systemPrompt || '' },
-              { role: 'user', content: `Analyze: ${JSON.stringify(args)}` }
-            ],
-            response_format: { type: 'json_object' }
-          })
-          const parsedResult = JSON.parse(completion.choices[0].message.content || '{}')
-          result = {
-            message: (parsedResult as any).message || (parsedResult as any).text || (parsedResult as any).response || 'Task completed',
-            data: parsedResult
+        let resultData: any;
+
+        try {
+          switch (fn.name) {
+            case 'check_calendar_availability':
+              resultData = await checkAvailability(args.timeMin, args.timeMax);
+              break;
+
+            case 'schedule_property_viewing':
+              resultData = await createEvent(
+                args.summary || 'GharSoch Property Viewing',
+                args.description || 'Scheduled via GharSoch Voice Orchestrator',
+                args.startTime,
+                args.endTime,
+                args.attendees
+              );
+              break;
+
+            case 'calculate_affordability':
+              // Simple mock implementation of affordability for the Voice Orchestrator
+              // In a full implementation, this could call callAIAgent with the Financial Agent ID
+              const { income, expenses, propertyPrice } = args;
+              const surplus = income - expenses;
+              const emi = propertyPrice * 0.008; // Rough estimate 8% over 20 years
+              
+              if (surplus >= emi * 1.5) {
+                resultData = { signal: 'Go', message: 'Comfortably affordable' };
+              } else if (surplus >= emi) {
+                resultData = { signal: 'Reconsider', message: 'Tight budget, consider financial restructuring' };
+              } else {
+                resultData = { signal: 'No-Go', message: 'Cannot afford this property currently' };
+              }
+              break;
+
+            default:
+              resultData = { error: `Unknown tool: ${fn.name}` };
           }
+        } catch (toolError: any) {
+          resultData = { error: toolError.message };
         }
 
-        if (fn.name === 'schedule_meeting') {
-          // Mock scheduling logic
-          result = { success: true, message: 'Meeting scheduled successfully', date: args.date }
-        }
-
+        // Vapi expects an array of results matching the tool call IDs
         results.push({
-          toolCallId: id,
-          result: JSON.stringify(result)
-        })
+          toolCallId: toolCallId,
+          result: resultData,
+        });
       }
 
-      return NextResponse.json({ results })
+      return NextResponse.json({ results });
     }
 
-    if (type === 'end-of-call-report') {
-      // Store call log in DB
-      const logs = await getCollection('call_logs')
-      await logs.insertOne({
-        id: call.id,
-        client_id: body.customer?.id || 'unknown',
-        direction: call.type === 'inbound' ? 'inbound' : 'outbound',
-        duration: call.duration,
+    if (payload.message?.type === 'end-of-call-report') {
+      console.log('[VAPI Webhook] Processing end-of-call-report...');
+      const transcript = payload.message.transcript || '';
+      
+      // Basic extraction (in production, this goes to Post-Call Sync Agent via OpenAI)
+      const sentimentScore = transcript.toLowerCase().includes('good') || transcript.toLowerCase().includes('yes') ? 0.8 : 0.5;
+      const affordabilitySignal = transcript.toLowerCase().includes('salary') ? 'Reconsider' : 'Unknown';
+
+      // Gracefully handle missing DB
+      if (!process.env.DATABASE_URL) {
+        console.log('[Mock DB] Saved Call Log:', { transcript, sentimentScore });
+        return NextResponse.json({ success: true });
+      }
+
+      const { getCollection } = await import('@/lib/mongodb');
+      const callLogs = await getCollection('call_logs');
+
+      await callLogs.insertOne({
+        direction: 'outbound',
+        duration: payload.message.duration || 0,
         timestamp: new Date().toISOString(),
-        sentiment_score: body.analysis?.sentiment === 'positive' ? 80 : 40,
-        transcript_summary: body.analysis?.summary || '',
-        agent_assigned: 'Voice Orchestrator',
-        raw_data: body
-      })
+        sentiment_score: sentimentScore,
+        transcript_summary: transcript.substring(0, 200) + '...',
+        affordability_signal: affordabilitySignal,
+      });
+
+      return NextResponse.json({ success: true, message: 'Call log saved' });
     }
 
-    return NextResponse.json({ success: true })
+    // For any other message types (like transcript, etc.), just acknowledge
+    console.log(`[VAPI Webhook] Received message type: ${payload.message?.type}`);
+    return NextResponse.json({ success: true });
 
   } catch (error) {
-    console.error('[Vapi/Webhook] Error:', error)
-    return NextResponse.json({ success: false, error: 'Webhook processing failed' }, { status: 500 })
+    console.error('[VAPI Webhook] Error:', error);
+    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
   }
 }

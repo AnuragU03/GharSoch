@@ -470,7 +470,7 @@ export default function AffordabilitySection() {
               <CardFooter className="flex justify-between">
                 <Button variant="ghost" onClick={() => setStep(2)}><ChevronLeft className="w-4 h-4 mr-2" /> Back</Button>
                 <Button onClick={handleAnalyze} disabled={loading || totalMonthlyIncome === 0} className="bg-primary hover:bg-primary/90 text-white px-8 py-6 h-auto text-lg shadow-lg shadow-primary/20">
-                  {loading ? 'Analyzing Intelligence...' : 'Generate AI Advisory'}
+                  {loading ? 'Analyzing Intelligence...' : 'Generate Advisory'}
                   {!loading && <ArrowRight className="w-5 h-5 ml-2" />}
                 </Button>
               </CardFooter>

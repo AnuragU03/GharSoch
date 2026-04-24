@@ -6,8 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { FiPhone, FiPhoneOff, FiMic, FiMicOff, FiActivity, FiLoader, FiAlertCircle } from 'react-icons/fi'
-
-const VOICE_AGENT_ID = '69e8f73cd8820b5d0188ed99'
+import Vapi from '@vapi-ai/web'
 
 type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'disconnected' | 'error'
 
@@ -31,290 +30,141 @@ export default function VoiceCallPanel({ onCallStateChange }: VoiceCallPanelProp
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([])
   const [callDuration, setCallDuration] = useState(0)
   const [audioLevel, setAudioLevel] = useState(0)
-  const [isReceivingAudio, setIsReceivingAudio] = useState(false)
-
-  const wsRef = useRef<WebSocket | null>(null)
-  const audioContextRef = useRef<AudioContext | null>(null)
-  const playbackContextRef = useRef<AudioContext | null>(null)
-  const processorRef = useRef<ScriptProcessorNode | null>(null)
-  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
-  const streamRef = useRef<MediaStream | null>(null)
-  const sampleRateRef = useRef(24000)
-  const nextPlayTimeRef = useRef(0)
-  const isMutedRef = useRef(false)
+  
+  const vapiRef = useRef<any>(null)
   const callTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const transcriptEndRef = useRef<HTMLDivElement>(null)
-  const receivingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // Keep mute ref in sync
-  useEffect(() => {
-    isMutedRef.current = isMuted
-  }, [isMuted])
 
   // Auto-scroll transcript
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [transcript])
+  }, [transcript, isThinking])
 
-  // Cleanup on unmount
+  // Initialize Vapi SDK
   useEffect(() => {
+    // Vapi Public Key should be in .env (e.g. NEXT_PUBLIC_VAPI_PUBLIC_KEY)
+    const publicKey = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY || 'mock-public-key'
+    
+    try {
+      vapiRef.current = new Vapi(publicKey)
+      
+      vapiRef.current.on('call-start', () => {
+        setStatus('connected')
+        setErrorMessage('')
+        setIsThinking(false)
+        onCallStateChange?.(true)
+        
+        // Start duration timer
+        setCallDuration(0)
+        if (callTimerRef.current) clearInterval(callTimerRef.current)
+        callTimerRef.current = setInterval(() => {
+          setCallDuration(prev => prev + 1)
+        }, 1000)
+      })
+
+      vapiRef.current.on('call-end', () => {
+        setStatus('disconnected')
+        cleanupCall()
+      })
+
+      vapiRef.current.on('message', (message: any) => {
+        if (message.type === 'transcript') {
+          const entry: TranscriptEntry = {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            role: message.role === 'user' ? 'user' : 'assistant',
+            text: message.transcript ?? '',
+            isFinal: message.transcriptType === 'final',
+            timestamp: Date.now(),
+          }
+          
+          setTranscript(prev => {
+            // Replace non-final transcripts
+            if (!entry.isFinal && prev.length > 0) {
+              const last = prev[prev.length - 1]
+              if (!last.isFinal && last.role === entry.role) {
+                return [...prev.slice(0, -1), entry]
+              }
+            }
+            return [...prev, entry]
+          })
+        }
+        
+        // Handle function calling indicator
+        if (message.type === 'function-call') {
+          setIsThinking(true)
+        }
+        if (message.type === 'function-call-result') {
+          setIsThinking(false)
+        }
+      })
+
+      vapiRef.current.on('error', (e: Error) => {
+        setErrorMessage(e.message || 'An error occurred during the call')
+        setStatus('error')
+        cleanupCall()
+      })
+      
+      vapiRef.current.on('volume-level', (volume: number) => {
+        // Vapi volume is typically 0 to 1
+        setAudioLevel(volume)
+      })
+
+    } catch (err: any) {
+      console.error('Failed to initialize Vapi:', err)
+      setErrorMessage('Failed to initialize voice orchestrator.')
+      setStatus('error')
+    }
+
     return () => {
       cleanupCall()
+      if (vapiRef.current) {
+        vapiRef.current.stop()
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [onCallStateChange])
 
-  const cleanupCall = useCallback(() => {
+  const cleanupCall = () => {
     if (callTimerRef.current) {
       clearInterval(callTimerRef.current)
       callTimerRef.current = null
     }
-    if (receivingTimeoutRef.current) {
-      clearTimeout(receivingTimeoutRef.current)
-      receivingTimeoutRef.current = null
-    }
-    if (wsRef.current) {
-      wsRef.current.close()
-      wsRef.current = null
-    }
-    if (processorRef.current) {
-      processorRef.current.disconnect()
-      processorRef.current = null
-    }
-    if (sourceRef.current) {
-      sourceRef.current.disconnect()
-      sourceRef.current = null
-    }
-    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-      audioContextRef.current.close().catch(() => {})
-      audioContextRef.current = null
-    }
-    if (playbackContextRef.current && playbackContextRef.current.state !== 'closed') {
-      playbackContextRef.current.close().catch(() => {})
-      playbackContextRef.current = null
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop())
-      streamRef.current = null
-    }
-    nextPlayTimeRef.current = 0
     setAudioLevel(0)
-    setIsReceivingAudio(false)
     setIsThinking(false)
-  }, [])
+    onCallStateChange?.(false)
+  }
 
-  const playAudioChunk = useCallback((base64Audio: string) => {
-    if (!playbackContextRef.current) return
-    try {
-      const binaryStr = atob(base64Audio)
-      const bytes = new Uint8Array(binaryStr.length)
-      for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i)
-
-      const pcm16 = new Int16Array(bytes.buffer)
-      const float32 = new Float32Array(pcm16.length)
-      for (let i = 0; i < pcm16.length; i++) {
-        float32[i] = pcm16[i] / 0x8000
-      }
-
-      const buffer = playbackContextRef.current.createBuffer(1, float32.length, sampleRateRef.current)
-      buffer.copyToChannel(float32, 0)
-
-      const sourceNode = playbackContextRef.current.createBufferSource()
-      sourceNode.buffer = buffer
-      sourceNode.connect(playbackContextRef.current.destination)
-
-      const now = playbackContextRef.current.currentTime
-      const startTime = Math.max(now, nextPlayTimeRef.current)
-      sourceNode.start(startTime)
-      nextPlayTimeRef.current = startTime + buffer.duration
-
-      // Visual indicator for receiving audio
-      setIsReceivingAudio(true)
-      if (receivingTimeoutRef.current) clearTimeout(receivingTimeoutRef.current)
-      receivingTimeoutRef.current = setTimeout(() => setIsReceivingAudio(false), 300)
-    } catch (err) {
-      console.error('Audio playback error:', err)
-    }
-  }, [])
-
-  const startCall = useCallback(async () => {
+  const startCall = async () => {
+    if (!vapiRef.current) return
     setStatus('connecting')
     setErrorMessage('')
     setTranscript([])
-    setCallDuration(0)
     setIsMuted(false)
-    isMutedRef.current = false
-    onCallStateChange?.(true)
-
+    
     try {
-      // Step 1: Start session
-      const res = await fetch('https://voice-sip.studio.lyzr.ai/session/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agentId: VOICE_AGENT_ID }),
-      })
-
-      if (!res.ok) {
-        throw new Error(`Session start failed: ${res.status} ${res.statusText}`)
-      }
-
-      const data = await res.json()
-      const wsUrl = data?.wsUrl
-      const sampleRate = data?.audioConfig?.sampleRate ?? 24000
-      sampleRateRef.current = sampleRate
-
-      if (!wsUrl) {
-        throw new Error('No WebSocket URL received from session start')
-      }
-
-      // Step 2: Setup audio contexts
-      const captureCtx = new AudioContext({ sampleRate })
-      audioContextRef.current = captureCtx
-
-      const playbackCtx = new AudioContext({ sampleRate })
-      playbackContextRef.current = playbackCtx
-      nextPlayTimeRef.current = 0
-
-      // Step 3: Get mic access
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      streamRef.current = stream
-
-      // Step 4: Connect WebSocket
-      const ws = new WebSocket(wsUrl)
-      wsRef.current = ws
-
-      ws.onopen = () => {
-        setStatus('connected')
-
-        // Start call timer
-        callTimerRef.current = setInterval(() => {
-          setCallDuration(prev => prev + 1)
-        }, 1000)
-
-        // Setup audio capture
-        const source = captureCtx.createMediaStreamSource(stream)
-        sourceRef.current = source
-        const processor = captureCtx.createScriptProcessor(4096, 1, 1)
-        processorRef.current = processor
-
-        // Silent gain node to avoid echo
-        const silentGain = captureCtx.createGain()
-        silentGain.gain.value = 0
-        silentGain.connect(captureCtx.destination)
-
-        source.connect(processor)
-        processor.connect(silentGain)
-
-        processor.onaudioprocess = (e) => {
-          if (isMutedRef.current) return
-          if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
-
-          const inputData = e.inputBuffer.getChannelData(0)
-
-          // Compute audio level for visualizer
-          let sum = 0
-          for (let i = 0; i < inputData.length; i++) {
-            sum += Math.abs(inputData[i])
-          }
-          const avg = sum / inputData.length
-          setAudioLevel(Math.min(avg * 5, 1))
-
-          // Convert to PCM16
-          const pcm16 = new Int16Array(inputData.length)
-          for (let i = 0; i < inputData.length; i++) {
-            const s = Math.max(-1, Math.min(1, inputData[i]))
-            pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
-          }
-
-          // Convert to base64
-          const bytes = new Uint8Array(pcm16.buffer)
-          let binary = ''
-          for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
-          const base64 = btoa(binary)
-
-          ws.send(JSON.stringify({
-            type: 'audio',
-            audio: base64,
-            sampleRate: sampleRateRef.current,
-          }))
-        }
-      }
-
-      ws.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data)
-          switch (msg.type) {
-            case 'audio':
-              setIsThinking(false)
-              playAudioChunk(msg.audio)
-              break
-            case 'transcript': {
-              const entry: TranscriptEntry = {
-                id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-                role: msg.role === 'user' ? 'user' : 'assistant',
-                text: msg.text ?? '',
-                isFinal: !!msg.final,
-                timestamp: Date.now(),
-              }
-              setTranscript(prev => {
-                // Replace non-final transcripts of the same role at the end
-                if (!entry.isFinal && prev.length > 0) {
-                  const last = prev[prev.length - 1]
-                  if (last && !last.isFinal && last.role === entry.role) {
-                    return [...prev.slice(0, -1), entry]
-                  }
-                }
-                return [...prev, entry]
-              })
-              break
-            }
-            case 'thinking':
-              setIsThinking(true)
-              break
-            case 'clear':
-              // Agent interrupted, clear pending audio
-              nextPlayTimeRef.current = 0
-              setIsThinking(false)
-              break
-            case 'error':
-              setErrorMessage(msg.message ?? msg.error ?? 'Voice agent error')
-              break
-          }
-        } catch {
-          // Ignore non-JSON messages
-        }
-      }
-
-      ws.onerror = () => {
-        setErrorMessage('WebSocket connection error')
-        setStatus('error')
-      }
-
-      ws.onclose = () => {
-        if (status !== 'error') {
-          setStatus('disconnected')
-        }
-        cleanupCall()
-        onCallStateChange?.(false)
-      }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to start call'
-      setErrorMessage(message)
+      const assistantId = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID || 'mock-assistant-id'
+      await vapiRef.current.start(assistantId)
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to start call')
       setStatus('error')
       cleanupCall()
-      onCallStateChange?.(false)
     }
-  }, [cleanupCall, onCallStateChange, playAudioChunk, status])
+  }
 
-  const endCall = useCallback(() => {
+  const endCall = () => {
+    if (vapiRef.current) {
+      vapiRef.current.stop()
+    }
     setStatus('disconnected')
     cleanupCall()
-    onCallStateChange?.(false)
-  }, [cleanupCall, onCallStateChange])
+  }
 
-  const toggleMute = useCallback(() => {
-    setIsMuted(prev => !prev)
-  }, [])
+  const toggleMute = () => {
+    if (vapiRef.current) {
+      const newMutedState = !isMuted
+      vapiRef.current.setMuted(newMutedState)
+      setIsMuted(newMutedState)
+    }
+  }
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60)
@@ -329,7 +179,7 @@ export default function VoiceCallPanel({ onCallStateChange }: VoiceCallPanelProp
       <CardHeader className="pb-3" style={{ background: 'linear-gradient(135deg, hsl(20, 15%, 12%) 0%, hsl(25, 20%, 18%) 100%)' }}>
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-semibold uppercase tracking-wider text-white/80 flex items-center gap-2">
-            <FiPhone className="w-4 h-4" /> Live Voice Call
+            <FiPhone className="w-4 h-4" /> Live Voice Orchestrator
           </CardTitle>
           <div className="flex items-center gap-2">
             {status === 'connected' && (
@@ -365,20 +215,9 @@ export default function VoiceCallPanel({ onCallStateChange }: VoiceCallPanelProp
           {/* Audio Visualizer Circle */}
           <div className="flex flex-col items-center mb-6">
             <div className="relative">
-              {/* Outer ring - pulses when receiving audio */}
-              <div
-                className={`absolute inset-0 rounded-full transition-all duration-300 ${isReceivingAudio ? 'scale-125 opacity-40' : 'scale-100 opacity-0'}`}
-                style={{
-                  background: 'radial-gradient(circle, hsl(25, 70%, 45%) 0%, transparent 70%)',
-                  width: '120px',
-                  height: '120px',
-                  top: '-10px',
-                  left: '-10px',
-                }}
-              />
               {/* Main circle */}
               <div
-                className="w-24 h-24 rounded-full flex items-center justify-center relative transition-all duration-200"
+                className="w-24 h-24 rounded-full flex items-center justify-center relative transition-all duration-75"
                 style={{
                   background: isActive
                     ? `radial-gradient(circle, hsl(25, 70%, ${35 + audioLevel * 20}%) 0%, hsl(25, 60%, ${25 + audioLevel * 10}%) 100%)`
@@ -404,7 +243,7 @@ export default function VoiceCallPanel({ onCallStateChange }: VoiceCallPanelProp
                 {isThinking && (
                   <p className="text-xs text-amber-400 mt-1 flex items-center gap-1 justify-center">
                     <FiLoader className="w-3 h-3 animate-spin" />
-                    AI is thinking...
+                    Agent is fetching data...
                   </p>
                 )}
                 {isMuted && (
@@ -417,7 +256,7 @@ export default function VoiceCallPanel({ onCallStateChange }: VoiceCallPanelProp
             )}
 
             {status === 'idle' && (
-              <p className="mt-4 text-sm text-white/40 text-center">Press Start Call to connect with the Voice Orchestrator</p>
+              <p className="mt-4 text-sm text-white/40 text-center">Press Start Call to connect with the AI Voice Orchestrator</p>
             )}
             {status === 'disconnected' && callDuration > 0 && (
               <p className="mt-4 text-sm text-white/50 text-center">Call ended - Duration: {formatTime(callDuration)}</p>
@@ -494,7 +333,7 @@ export default function VoiceCallPanel({ onCallStateChange }: VoiceCallPanelProp
                     } ${!entry.isFinal ? 'opacity-60' : ''}`}
                   >
                     <p className="text-[10px] font-semibold mb-0.5 uppercase tracking-wider" style={{ color: entry.role === 'user' ? 'hsl(25, 70%, 50%)' : 'hsl(210, 50%, 50%)' }}>
-                      {entry.role === 'user' ? 'You' : 'AI Agent'}
+                      {entry.role === 'user' ? 'You' : 'Agent'}
                     </p>
                     <p className="text-sm leading-relaxed">{entry.text}</p>
                     {!entry.isFinal && (
@@ -507,9 +346,9 @@ export default function VoiceCallPanel({ onCallStateChange }: VoiceCallPanelProp
                 <div className="flex justify-start">
                   <div className="px-3 py-2 rounded-lg bg-muted text-foreground rounded-bl-sm">
                     <p className="text-[10px] font-semibold mb-0.5 uppercase tracking-wider" style={{ color: 'hsl(210, 50%, 50%)' }}>
-                      AI Agent
+                      Agent
                     </p>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 mt-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '0ms' }} />
                       <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '150ms' }} />
                       <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '300ms' }} />

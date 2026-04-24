@@ -81,7 +81,7 @@ const createErrorDetails = (
   type,
   message,
   raw_response,
-  endpoint: `${process.env.NEXT_PUBLIC_LYZR_AGENT_BASE_URL || 'https://agent-prod.studio.lyzr.ai'}/v3/inference/chat`,
+  endpoint: '/api/agent',
   timestamp: new Date().toISOString(),
   userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
   url: typeof window !== 'undefined' ? window.location.href : 'unknown',
