@@ -1,11 +1,11 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { HiOutlinePhone, HiOutlineUsers, HiOutlineCalendarDays } from 'react-icons/hi2'
-import { FiTrendingUp, FiActivity, FiCpu, FiAlertCircle } from 'react-icons/fi'
+import { FiTrendingUp, FiActivity, FiCpu, FiAlertCircle, FiLoader } from 'react-icons/fi'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { Button } from '@/components/ui/button'
 
@@ -13,32 +13,6 @@ interface DashboardProps {
   sampleMode: boolean
   onNavigate: (screen: string) => void
 }
-
-const DONUT_DATA = [
-  { name: 'Go', value: 45, color: 'hsl(142, 71%, 45%)' },
-  { name: 'Reconsider', value: 35, color: 'hsl(38, 92%, 50%)' },
-  { name: 'No-Go', value: 20, color: 'hsl(0, 84%, 60%)' },
-]
-
-const AGENTS_SUMMARY = [
-  { name: 'Voice Orchestrator', status: 'active', actions: 47 },
-  { name: 'Lead Qualification', status: 'active', actions: 32 },
-  { name: 'Financial Advisory', status: 'active', actions: 18 },
-  { name: 'Property Search', status: 'idle', actions: 24 },
-  { name: 'Calendar Scheduling', status: 'active', actions: 11 },
-  { name: 'Post-Call Sync', status: 'active', actions: 29 },
-  { name: 'Re-engagement', status: 'processing', actions: 8 },
-  { name: 'Self-Service Advisor', status: 'idle', actions: 15 },
-]
-
-const RECENT_ACTIVITY = [
-  { time: '2 min ago', event: 'Call completed with Rajesh Mehta', agent: 'Voice Orchestrator', type: 'call', signal: 'Go' },
-  { time: '5 min ago', event: 'Lead qualified: Priya Sharma (Score: 87)', agent: 'Lead Qualification', type: 'lead' },
-  { time: '8 min ago', event: 'Appointment set: April 24, 3:00 PM', agent: 'Calendar Scheduling', type: 'calendar' },
-  { time: '12 min ago', event: 'CRM synced for Amit Patel', agent: 'Post-Call Sync', type: 'sync' },
-  { time: '15 min ago', event: 'Re-engagement campaign triggered', agent: 'Re-engagement', type: 'campaign' },
-  { time: '22 min ago', event: 'Financial assessment: Sunita Rao', agent: 'Financial Advisory', type: 'finance', signal: 'Reconsider' },
-]
 
 function statusColor(status: string) {
   if (status === 'active') return 'bg-emerald-500'
@@ -53,13 +27,66 @@ function signalBadge(signal?: string) {
     'Reconsider': 'bg-amber-500/10 text-amber-500 border-amber-500/20',
     'No-Go': 'bg-red-500/10 text-red-500 border-red-500/20'
   }
-  return <Badge variant="outline" className={`text-[10px] ml-2 ${(colors as any)[signal]}`}>{signal}</Badge>
+  return <Badge variant="outline" className={`text-[10px] ml-2 ${(colors as any)[signal] || 'bg-gray-500/10 text-gray-400'}`}>{signal}</Badge>
 }
 
 export default function DashboardSection({ sampleMode, onNavigate }: DashboardProps) {
-  const stats = sampleMode
-    ? { activeCalls: 4, callsToday: 47, avgSentiment: 82, meetingsBooked: 11 }
-    : { activeCalls: 0, callsToday: 0, avgSentiment: 0, meetingsBooked: 0 }
+  const [stats, setStats] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        const res = await fetch('/api/dashboard/stats')
+        const data = await res.json()
+        setStats(data)
+      } catch (err) {
+        console.error('Failed to load dashboard stats', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (!sampleMode) {
+      fetchStats()
+    } else {
+      // Load mock data if sample mode is ON
+      setStats({
+        activeCalls: 4,
+        callsToday: 47,
+        avgSentiment: 82,
+        meetingsBooked: 11,
+        signalMix: { go: 45, reconsider: 35, noGo: 20 },
+        recentActivity: [
+          { time: '2 min ago', event: 'Call completed with Rajesh Mehta', agent: 'Voice Orchestrator', type: 'call', signal: 'Go' },
+          { time: '5 min ago', event: 'Lead qualified: Priya Sharma (Score: 87)', agent: 'Lead Qualification', type: 'lead' },
+          { time: '8 min ago', event: 'Appointment set: April 24, 3:00 PM', agent: 'Calendar Scheduling', type: 'calendar' },
+        ],
+        agentsSummary: [
+          { name: 'Voice Orchestrator', status: 'active', actions: 47 },
+          { name: 'Lead Qualification', status: 'active', actions: 32 },
+          { name: 'Financial Advisory', status: 'active', actions: 18 },
+        ]
+      })
+      setLoading(false)
+    }
+  }, [sampleMode])
+
+  if (loading || !stats) {
+    return (
+      <div className="flex items-center justify-center h-[500px]">
+        <FiLoader className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  const donutData = [
+    { name: 'Go', value: stats.signalMix.go, color: 'hsl(142, 71%, 45%)' },
+    { name: 'Reconsider', value: stats.signalMix.reconsider, color: 'hsl(38, 92%, 50%)' },
+    { name: 'No-Go', value: stats.signalMix.noGo, color: 'hsl(0, 84%, 60%)' },
+  ].filter(d => d.value > 0) // Hide empty segments
+
+  const displayDonutData = donutData.length > 0 ? donutData : [{ name: 'Empty', value: 1, color: 'hsl(0, 0%, 20%)' }]
 
   return (
     <div className="space-y-6">
@@ -115,14 +142,14 @@ export default function DashboardSection({ sampleMode, onNavigate }: DashboardPr
         <Card className="border-white/5 bg-card/50 backdrop-blur-sm relative overflow-hidden">
           <div className="absolute top-2 right-2">
              <PieChart width={60} height={60}>
-               <Pie data={DONUT_DATA} innerRadius={18} outerRadius={28} dataKey="value" stroke="none">
-                 {DONUT_DATA.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+               <Pie data={displayDonutData} innerRadius={18} outerRadius={28} dataKey="value" stroke="none">
+                 {displayDonutData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                </Pie>
              </PieChart>
           </div>
           <CardContent className="pt-5 pb-4 px-5">
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Signal Mix</p>
-            <p className="text-2xl font-bold mt-2 text-white">45:35</p>
+            <p className="text-2xl font-bold mt-2 text-white">{stats.signalMix.go}:{stats.signalMix.reconsider}</p>
             <p className="text-[10px] text-emerald-400 mt-1 uppercase font-bold tracking-tighter">Go : Reconsider</p>
           </CardContent>
         </Card>
@@ -137,30 +164,34 @@ export default function DashboardSection({ sampleMode, onNavigate }: DashboardPr
           </CardHeader>
           <CardContent className="px-2">
              <div className="space-y-1">
-                {RECENT_ACTIVITY.map((a, i) => (
-                  <div key={i} className="flex items-center gap-4 px-4 py-3 hover:bg-white/5 rounded-xl transition-all cursor-pointer">
-                    <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center border border-white/5">
-                      <HiOutlinePhone className={`w-4 h-4 ${a.type === 'call' ? 'text-primary' : 'text-muted-foreground'}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                       <div className="flex items-center">
-                         <span className="text-sm font-semibold text-white truncate">{a.event}</span>
-                         {signalBadge(a.signal)}
-                       </div>
-                       <div className="flex items-center gap-2 mt-0.5">
-                         <span className="text-[10px] text-muted-foreground">{a.time}</span>
-                         <span className="text-[10px] font-bold uppercase tracking-tighter text-primary">{a.agent}</span>
-                       </div>
-                    </div>
-                    {a.type === 'call' && (
-                      <div className="flex gap-1">
-                        <div className="w-1 h-3 bg-emerald-500 rounded-full" />
-                        <div className="w-1 h-5 bg-emerald-500 rounded-full" />
-                        <div className="w-1 h-2 bg-emerald-500 rounded-full" />
+                {stats.recentActivity.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">No recent call activity. Trigger a campaign to start calling!</p>
+                ) : (
+                  stats.recentActivity.map((a: any, i: number) => (
+                    <div key={i} className="flex items-center gap-4 px-4 py-3 hover:bg-white/5 rounded-xl transition-all cursor-pointer">
+                      <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center border border-white/5">
+                        <HiOutlinePhone className={`w-4 h-4 ${a.type === 'call' ? 'text-primary' : 'text-muted-foreground'}`} />
                       </div>
-                    )}
-                  </div>
-                ))}
+                      <div className="flex-1 min-w-0">
+                         <div className="flex items-center">
+                           <span className="text-sm font-semibold text-white truncate">{a.event}</span>
+                           {signalBadge(a.signal)}
+                         </div>
+                         <div className="flex items-center gap-2 mt-0.5">
+                           <span className="text-[10px] text-muted-foreground">{a.time}</span>
+                           <span className="text-[10px] font-bold uppercase tracking-tighter text-primary">{a.agent}</span>
+                         </div>
+                      </div>
+                      {a.type === 'call' && (
+                        <div className="flex gap-1">
+                          <div className="w-1 h-3 bg-emerald-500 rounded-full" />
+                          <div className="w-1 h-5 bg-emerald-500 rounded-full" />
+                          <div className="w-1 h-2 bg-emerald-500 rounded-full" />
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
              </div>
              <Button variant="ghost" size="sm" onClick={() => onNavigate('calls')} className="mt-4 ml-4 text-[11px] text-primary hover:text-primary hover:bg-primary/10">
                View All Call Logs &rarr;
@@ -176,7 +207,7 @@ export default function DashboardSection({ sampleMode, onNavigate }: DashboardPr
           </CardHeader>
           <CardContent className="px-4">
              <div className="grid grid-cols-1 gap-2">
-                {AGENTS_SUMMARY.map((a, i) => (
+                {stats.agentsSummary.map((a: any, i: number) => (
                   <div key={i} className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-white/5 hover:border-primary/20 transition-all">
                     <div className="flex items-center gap-3">
                        <div className={`w-2 h-2 rounded-full ${statusColor(a.status)}`} />

@@ -1,13 +1,13 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet'
-import { FiCpu, FiMessageSquare, FiSend, FiX } from 'react-icons/fi'
+import { FiCpu, FiMessageSquare, FiSend, FiLoader } from 'react-icons/fi'
 import { AiOutlineLoading3Quarters } from 'react-icons/ai'
 import { callAIAgent } from '@/lib/aiAgent'
 
@@ -21,9 +21,6 @@ const AGENTS = [
     name: 'Voice Conversation Orchestrator',
     role: 'Manages live voice calls, routes buyer intent to specialists, handles escalation and voicemail',
     type: 'voice',
-    status: 'active',
-    lastAction: '2 min ago',
-    actionsToday: 47,
     model: 'gpt-4o-mini',
     provider: 'OpenAI',
   },
@@ -32,9 +29,6 @@ const AGENTS = [
     name: 'Lead Qualification & Objection Agent',
     role: 'Analyzes and qualifies leads, handles buyer objections with data-driven responses',
     type: 'json',
-    status: 'active',
-    lastAction: '5 min ago',
-    actionsToday: 32,
     model: 'gpt-4o-mini',
     provider: 'OpenAI',
   },
@@ -43,9 +37,6 @@ const AGENTS = [
     name: 'GharSoch Financial Advisory Agent',
     role: 'Provides financial guidance on affordability, EMI, taxes, and budget planning for buyers',
     type: 'json',
-    status: 'active',
-    lastAction: '8 min ago',
-    actionsToday: 18,
     model: 'gpt-4o-mini',
     provider: 'OpenAI',
   },
@@ -54,9 +45,6 @@ const AGENTS = [
     name: 'Property Search Agent',
     role: 'Searches property knowledge base to find matching listings based on buyer criteria',
     type: 'json',
-    status: 'idle',
-    lastAction: '28 min ago',
-    actionsToday: 24,
     model: 'gpt-4o-mini',
     provider: 'OpenAI',
     hasKB: true,
@@ -66,9 +54,6 @@ const AGENTS = [
     name: 'Calendar Scheduling Agent',
     role: 'Manages Google Calendar integration for booking property viewings and consultations',
     type: 'json',
-    status: 'active',
-    lastAction: '8 min ago',
-    actionsToday: 11,
     model: 'gpt-4o-mini',
     provider: 'OpenAI',
     hasTools: true,
@@ -78,9 +63,6 @@ const AGENTS = [
     name: 'Post-Call Sync Agent',
     role: 'Syncs call data, sentiment scores, and lead status to CRM after each conversation',
     type: 'json',
-    status: 'active',
-    lastAction: '12 min ago',
-    actionsToday: 29,
     model: 'gpt-4o-mini',
     provider: 'OpenAI',
   },
@@ -89,9 +71,6 @@ const AGENTS = [
     name: 'Property Re-engagement Agent',
     role: 'Runs scheduled campaigns to re-engage dormant leads with new property matches',
     type: 'json',
-    status: 'processing',
-    lastAction: '15 min ago',
-    actionsToday: 8,
     model: 'gpt-4o-mini',
     provider: 'OpenAI',
     scheduled: true,
@@ -101,9 +80,6 @@ const AGENTS = [
     name: 'GharSoch Self-Service Advisor',
     role: 'Interactive affordability calculator and property advisory tool for end users',
     type: 'json',
-    status: 'idle',
-    lastAction: '35 min ago',
-    actionsToday: 15,
     model: 'gpt-4o-mini',
     provider: 'OpenAI',
   },
@@ -122,17 +98,53 @@ function statusDot(status: string) {
 }
 
 export default function AgentStatusSection({ sampleMode }: AgentStatusProps) {
-  const agents = sampleMode ? AGENTS : AGENTS.map(a => ({ ...a, status: 'idle', lastAction: '--', actionsToday: 0 }))
+  const [agentsData, setAgentsData] = useState<any[] | null>(null)
+  const [loadingStats, setLoadingStats] = useState(true)
   
   const [activeAgent, setActiveAgent] = useState<typeof AGENTS[0] | null>(null)
   const [messages, setMessages] = useState<{role: 'user' | 'agent', text: string}[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
 
+  useEffect(() => {
+    async function fetchAgentStats() {
+      try {
+        const res = await fetch('/api/dashboard/stats')
+        const data = await res.json()
+        const liveAgents = AGENTS.map(agent => {
+          const stats = data.agentsSummary.find((s: any) => s.name === agent.name)
+          return {
+            ...agent,
+            status: stats ? stats.status : 'idle',
+            actionsToday: stats ? stats.actions : 0,
+            lastAction: stats && stats.actions > 0 ? 'Recently' : '--'
+          }
+        })
+        setAgentsData(liveAgents)
+      } catch (err) {
+        console.error('Failed to load agent stats', err)
+      } finally {
+        setLoadingStats(false)
+      }
+    }
+
+    if (!sampleMode) {
+      fetchAgentStats()
+    } else {
+      setAgentsData(AGENTS.map(a => ({
+        ...a,
+        status: ['Voice Conversation Orchestrator', 'Lead Qualification & Objection Agent'].includes(a.name) ? 'active' : 'idle',
+        actionsToday: Math.floor(Math.random() * 50),
+        lastAction: '2 min ago'
+      })))
+      setLoadingStats(false)
+    }
+  }, [sampleMode])
+
   const openAgentChat = (agent: typeof AGENTS[0]) => {
     setActiveAgent(agent)
     setMessages([
-      { role: 'agent', text: `Hello! I am the ${agent.name}. How can I assist you today?` }
+      { role: 'agent', text: `[Test Terminal Active]\n\nHello, I am the ${agent.name}. This is a text-based terminal to test my prompt. Note: For actual live voice interactions, please use the Voice Call Panel or trigger a campaign. How can I assist you?` }
     ])
   }
 
@@ -147,7 +159,6 @@ export default function AgentStatusSection({ sampleMode }: AgentStatusProps) {
     try {
       const result = await callAIAgent(userMessage, activeAgent.id)
       if (result.success) {
-        // Handle varying response formats based on the agent type
         let responseText = 'Task completed successfully.'
         const resultData = result.response?.result
         
@@ -172,6 +183,14 @@ export default function AgentStatusSection({ sampleMode }: AgentStatusProps) {
     setLoading(false)
   }
 
+  if (loadingStats || !agentsData) {
+    return (
+      <div className="flex items-center justify-center h-[500px]">
+        <FiLoader className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -180,7 +199,7 @@ export default function AgentStatusSection({ sampleMode }: AgentStatusProps) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {agents.map((agent) => {
+        {agentsData.map((agent) => {
           const sb = statusBadge(agent.status)
           return (
             <Card 
@@ -301,4 +320,3 @@ export default function AgentStatusSection({ sampleMode }: AgentStatusProps) {
     </div>
   )
 }
-
