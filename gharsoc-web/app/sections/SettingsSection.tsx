@@ -1,217 +1,79 @@
 'use client'
-
-import React, { useState, useEffect, useRef } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
-import { Switch } from '@/components/ui/switch'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Separator } from '@/components/ui/separator'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { AiOutlineLoading3Quarters } from 'react-icons/ai'
-import { FiUpload, FiTrash2, FiGlobe } from 'react-icons/fi'
-import { HiOutlineCog6Tooth } from 'react-icons/hi2'
-import { uploadAndTrainDocument, getDocuments, deleteDocuments, crawlWebsite, validateFile } from '@/lib/ragKnowledgeBase'
-
-const RAG_ID = '69e8f683aa9f34bdaf6dcde1'
-
-const AGENTS_CONFIG = [
-  { name: 'Voice Orchestrator', id: '69e8f73c...ed99', type: 'Voice', model: 'GPT-4.1', status: 'Autonomous' },
-  { name: 'Lead Qualification', id: '69e8f707...d22', type: 'JSON', model: 'Claude Sonnet', status: 'Autonomous' },
-  { name: 'Financial Advisory', id: '69e8f708...a83', type: 'JSON', model: 'Claude Sonnet', status: 'Autonomous' },
-  { name: 'Property Search', id: '69e8f709...889', type: 'JSON', model: 'Claude Sonnet', status: 'KB-backed' },
-  { name: 'Calendar Scheduling', id: '69e8f71e...d95', type: 'JSON', model: 'Claude Sonnet', status: 'Tools: GCal' },
-  { name: 'Post-Call Sync', id: '69e8f709...d24', type: 'JSON', model: 'Claude Sonnet', status: 'Autonomous' },
-  { name: 'Re-engagement', id: '69e8f70a...a92', type: 'JSON', model: 'Claude Sonnet', status: 'Scheduled' },
-  { name: 'Self-Service Advisor', id: '69e8f709...d26', type: 'JSON', model: 'Claude Sonnet', status: 'Interactive' },
-]
+import { HiOutlineNoSymbol } from 'react-icons/hi2'
+import { FiTrash2 } from 'react-icons/fi'
 
 export default function SettingsSection() {
-  const [greeting, setGreeting] = useState('Welcome to GharSoch. I am your real estate financial advisor. How can I help you today?')
-  const [voicemailScript, setVoicemailScript] = useState('Thank you for calling GharSoch. Please leave your name and number.')
-  const [notifEmail, setNotifEmail] = useState(true)
-  const [notifEscalation, setNotifEscalation] = useState(true)
-  const [notifDaily, setNotifDaily] = useState(false)
+  const [dncList, setDncList] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [phone, setPhone] = useState('')
+  const [reason, setReason] = useState('')
 
-  const [docs, setDocs] = useState<any[]>([])
-  const [docsLoading, setDocsLoading] = useState(false)
-  const [uploadLoading, setUploadLoading] = useState(false)
-  const [crawlUrl, setCrawlUrl] = useState('')
-  const [crawlLoading, setCrawlLoading] = useState(false)
-  const [kbStatus, setKbStatus] = useState('')
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => { loadDocs() }, [])
-
-  const loadDocs = async () => {
-    setDocsLoading(true)
-    try {
-      const res = await getDocuments(RAG_ID)
-      if (res.success) setDocs(Array.isArray(res.documents) ? res.documents : [])
-    } catch {}
-    setDocsLoading(false)
+  const fetchDnc = async () => {
+    setLoading(true)
+    try { const r = await fetch('/api/dnc'); const d = await r.json(); if (d.success) setDncList(d.dnc) } catch {}
+    setLoading(false)
   }
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const validation = validateFile(file)
-    if (!validation.valid) { setKbStatus(validation.error || 'Invalid file'); return }
-    setUploadLoading(true); setKbStatus('')
-    const res = await uploadAndTrainDocument(RAG_ID, file)
-    setKbStatus(res.success ? 'Document uploaded and training started' : `Upload failed: ${res.error || 'Unknown error'}`)
-    if (res.success) await loadDocs()
-    setUploadLoading(false)
-    if (fileInputRef.current) fileInputRef.current.value = ''
+  useEffect(() => { fetchDnc() }, [])
+
+  const handleAddDnc = async () => {
+    if (!phone) return
+    const r = await fetch('/api/dnc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone, reason }) })
+    if ((await r.json()).success) { setPhone(''); setReason(''); fetchDnc() }
   }
 
-  const handleDelete = async (fileName: string) => {
-    setDocsLoading(true)
-    await deleteDocuments(RAG_ID, [fileName])
-    await loadDocs()
-  }
-
-  const handleCrawl = async () => {
-    if (!crawlUrl.trim()) return
-    setCrawlLoading(true); setKbStatus('')
-    const res = await crawlWebsite(RAG_ID, crawlUrl)
-    setKbStatus(res.success ? 'Website crawled successfully' : `Crawl failed: ${res.error || 'Unknown error'}`)
-    setCrawlLoading(false)
-    if (res.success) { setCrawlUrl(''); await loadDocs() }
+  const handleRemoveDnc = async (p: string) => {
+    if (!confirm('Remove from DNC?')) return
+    await fetch(`/api/dnc?phone=${encodeURIComponent(p)}`, { method: 'DELETE' }); fetchDnc()
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">Settings</h2>
-        <p className="text-sm text-muted-foreground mt-1">Platform configuration and knowledge base management</p>
+    <div className="max-w-4xl space-y-8">
+      <div><h2 className="text-xl font-bold">Settings</h2><p className="text-sm text-muted-foreground">Platform configuration and compliance</p></div>
+
+      <div className="border border-border rounded-xl bg-card overflow-hidden">
+        <div className="p-5 border-b border-border bg-muted/10">
+          <h3 className="font-semibold flex items-center gap-2"><HiOutlineNoSymbol className="text-destructive" /> Do Not Call (DNC) Registry</h3>
+          <p className="text-sm text-muted-foreground mt-1">Numbers listed here will never be dialed by the outbound campaigns or agents. TRAI compliance is strictly enforced.</p>
+        </div>
+        <div className="p-5">
+          <div className="flex gap-3 items-end mb-6">
+            <div><Label className="text-xs">Phone Number *</Label><Input placeholder="+91..." value={phone} onChange={e => setPhone(e.target.value)} className="w-48" /></div>
+            <div className="flex-1"><Label className="text-xs">Reason (optional)</Label><Input placeholder="Customer requested" value={reason} onChange={e => setReason(e.target.value)} /></div>
+            <Button onClick={handleAddDnc} disabled={!phone} variant="destructive">Block Number</Button>
+          </div>
+
+          <div className="border border-border rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead><tr className="border-b bg-muted/30"><th className="text-left px-4 py-2 font-medium text-xs uppercase text-muted-foreground">Number</th><th className="text-left px-4 py-2 font-medium text-xs uppercase text-muted-foreground">Name</th><th className="text-left px-4 py-2 font-medium text-xs uppercase text-muted-foreground">Added On</th><th className="text-right px-4 py-2 font-medium text-xs uppercase text-muted-foreground">Action</th></tr></thead>
+              <tbody>
+                {loading ? <tr><td colSpan={4} className="px-4 py-4 text-center">Loading...</td></tr> : dncList.length === 0 ? <tr><td colSpan={4} className="px-4 py-4 text-center text-muted-foreground">No numbers in DNC registry.</td></tr> : dncList.map(d => (
+                  <tr key={d.phone} className="border-b border-border/50">
+                    <td className="px-4 py-2.5 font-medium">{d.phone}</td>
+                    <td className="px-4 py-2.5 text-muted-foreground">{d.name}</td>
+                    <td className="px-4 py-2.5 text-muted-foreground">{new Date(d.updated_at).toLocaleDateString()}</td>
+                    <td className="px-4 py-2.5 text-right"><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleRemoveDnc(d.phone)}><FiTrash2 className="w-3.5 h-3.5 text-muted-foreground" /></Button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
-      <Tabs defaultValue="agents">
-        <TabsList className="bg-muted flex-wrap h-auto">
-          <TabsTrigger value="agents" className="text-xs">Agent Config</TabsTrigger>
-          <TabsTrigger value="scripts" className="text-xs">Scripts</TabsTrigger>
-          <TabsTrigger value="kb" className="text-xs">Knowledge Base</TabsTrigger>
-          <TabsTrigger value="notifications" className="text-xs">Notifications</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="agents" className="mt-4">
-          <Card className="border-border bg-card">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                <HiOutlineCog6Tooth className="w-4 h-4" /> Agent Configuration (Read-only)
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {AGENTS_CONFIG.map((agent, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 rounded-lg border border-border bg-background">
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
-                      <div>
-                        <p className="text-sm font-medium">{agent.name}</p>
-                        <p className="text-[10px] text-muted-foreground font-mono">{agent.id}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-[10px]">{agent.type}</Badge>
-                      <Badge variant="outline" className="text-[10px]">{agent.model}</Badge>
-                      <Badge variant="outline" className="text-[10px] text-emerald-500 border-emerald-500/30">{agent.status}</Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="scripts" className="mt-4 space-y-4">
-          <Card className="border-border bg-card">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Agent Greeting Script</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Textarea value={greeting} onChange={e => setGreeting(e.target.value)} rows={3} />
-              <p className="text-[10px] text-muted-foreground">This greeting is used by the Voice Orchestrator when answering calls.</p>
-            </CardContent>
-          </Card>
-          <Card className="border-border bg-card">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Voicemail Script</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Textarea value={voicemailScript} onChange={e => setVoicemailScript(e.target.value)} rows={3} />
-              <p className="text-[10px] text-muted-foreground">Played when the system detects a voicemail scenario.</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="kb" className="mt-4">
-          <Card className="border-border bg-card">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Property Knowledge Base</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {kbStatus && <p className="text-xs" style={{ color: 'hsl(25, 70%, 50%)' }}>{kbStatus}</p>}
-              <div className="flex items-center gap-3">
-                <input ref={fileInputRef} type="file" accept=".pdf,.docx,.txt" onChange={handleUpload} className="hidden" />
-                <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploadLoading}>
-                  {uploadLoading ? <AiOutlineLoading3Quarters className="h-3 w-3 mr-2 animate-spin" /> : <FiUpload className="h-3 w-3 mr-2" />} Upload Document
-                </Button>
-                <span className="text-xs text-muted-foreground">PDF, DOCX, TXT</span>
-              </div>
-              <Separator />
-              <div className="flex items-center gap-2">
-                <Input value={crawlUrl} onChange={e => setCrawlUrl(e.target.value)} placeholder="https://example.com/properties" className="flex-1" />
-                <Button variant="outline" size="sm" onClick={handleCrawl} disabled={crawlLoading || !crawlUrl.trim()}>
-                  {crawlLoading ? <AiOutlineLoading3Quarters className="h-3 w-3 animate-spin" /> : <FiGlobe className="h-3 w-3 mr-1" />} Crawl
-                </Button>
-              </div>
-              <Separator />
-              {docsLoading && <AiOutlineLoading3Quarters className="h-4 w-4 animate-spin" style={{ color: 'hsl(25, 70%, 45%)' }} />}
-              {docs.length === 0 && !docsLoading && <p className="text-xs text-muted-foreground">No documents uploaded yet.</p>}
-              <ScrollArea className="max-h-48">
-                <div className="space-y-2">
-                  {docs.map((d: any, i: number) => (
-                    <div key={i} className="flex items-center justify-between p-2.5 border border-border rounded-lg bg-background">
-                      <div>
-                        <p className="text-sm">{d?.fileName ?? 'Unknown'}</p>
-                        <p className="text-[10px] text-muted-foreground">{d?.fileType ?? ''} | {d?.status ?? 'unknown'}</p>
-                      </div>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(d?.fileName ?? '')} className="h-7 w-7 text-red-400 hover:text-red-500">
-                        <FiTrash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="notifications" className="mt-4">
-          <Card className="border-border bg-card">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Notification Preferences</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {[
-                { label: 'Email notifications for converted leads', checked: notifEmail, onChange: setNotifEmail },
-                { label: 'Escalation alerts (low sentiment)', checked: notifEscalation, onChange: setNotifEscalation },
-                { label: 'Daily performance digest', checked: notifDaily, onChange: setNotifDaily },
-              ].map((item, i) => (
-                <div key={i} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
-                  <Label className="text-sm">{item.label}</Label>
-                  <Switch checked={item.checked} onCheckedChange={item.onChange} />
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      <div className="border border-border rounded-xl bg-card p-5 opacity-60">
+        <h3 className="font-semibold">Integrations</h3>
+        <p className="text-sm text-muted-foreground mt-1 mb-4">API Keys and Webhooks (Configured via Environment Variables)</p>
+        <div className="space-y-3 max-w-lg">
+          <div><Label className="text-xs">Vapi API Key</Label><Input value="••••••••••••••••••••••••" disabled /></div>
+          <div><Label className="text-xs">Twilio Account SID</Label><Input value="••••••••••••••••••••••••" disabled /></div>
+          <div><Label className="text-xs">OpenAI Key</Label><Input value="••••••••••••••••••••••••" disabled /></div>
+        </div>
+      </div>
     </div>
   )
 }

@@ -1,222 +1,143 @@
 'use client'
-
 import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { HiOutlinePhone, HiOutlineUsers, HiOutlineCalendarDays } from 'react-icons/hi2'
-import { FiTrendingUp, FiActivity, FiCpu, FiAlertCircle, FiLoader } from 'react-icons/fi'
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
-import { Button } from '@/components/ui/button'
+import { HiOutlineUserGroup, HiOutlinePhone, HiOutlineCalendarDays, HiOutlineMegaphone } from 'react-icons/hi2'
+import { FiTrendingUp, FiActivity } from 'react-icons/fi'
 
-interface DashboardProps {
-  sampleMode: boolean
-  onNavigate: (screen: string) => void
+interface DashStats {
+  totalLeads: number; newLeadsToday: number; hotLeads: number; qualifiedLeads: number
+  totalCalls: number; callsToday: number; avgCallDuration: number
+  totalAppointments: number; upcomingAppointments: number
+  activeCampaigns: number; totalCampaigns: number; dncCount: number
+  funnel: { total: number; contacted: number; qualified: number; appointed: number }
 }
 
-function statusColor(status: string) {
-  if (status === 'active') return 'bg-emerald-500'
-  if (status === 'processing') return 'bg-amber-500 animate-pulse'
-  return 'bg-gray-400'
-}
-
-function signalBadge(signal?: string) {
-  if (!signal) return null
-  const colors = {
-    'Go': 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
-    'Reconsider': 'bg-amber-500/10 text-amber-500 border-amber-500/20',
-    'No-Go': 'bg-red-500/10 text-red-500 border-red-500/20'
-  }
-  return <Badge variant="outline" className={`text-[10px] ml-2 ${(colors as any)[signal] || 'bg-gray-500/10 text-gray-400'}`}>{signal}</Badge>
-}
-
-export default function DashboardSection({ sampleMode, onNavigate }: DashboardProps) {
-  const [stats, setStats] = useState<any>(null)
+export default function DashboardSection({ onNavigate }: { onNavigate: (s: string) => void }) {
+  const [stats, setStats] = useState<DashStats | null>(null)
+  const [activities, setActivities] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    async function fetchStats() {
+    const fetchAll = async () => {
       try {
-        const res = await fetch('/api/dashboard/stats')
-        const data = await res.json()
-        setStats(data)
-      } catch (err) {
-        console.error('Failed to load dashboard stats', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    if (!sampleMode) {
-      fetchStats()
-    } else {
-      // Load mock data if sample mode is ON
-      setStats({
-        activeCalls: 4,
-        callsToday: 47,
-        avgSentiment: 82,
-        meetingsBooked: 11,
-        signalMix: { go: 45, reconsider: 35, noGo: 20 },
-        recentActivity: [
-          { time: '2 min ago', event: 'Call completed with Rajesh Mehta', agent: 'Voice Orchestrator', type: 'call', signal: 'Go' },
-          { time: '5 min ago', event: 'Lead qualified: Priya Sharma (Score: 87)', agent: 'Lead Qualification', type: 'lead' },
-          { time: '8 min ago', event: 'Appointment set: April 24, 3:00 PM', agent: 'Calendar Scheduling', type: 'calendar' },
-        ],
-        agentsSummary: [
-          { name: 'Voice Orchestrator', status: 'active', actions: 47 },
-          { name: 'Lead Qualification', status: 'active', actions: 32 },
-          { name: 'Financial Advisory', status: 'active', actions: 18 },
-        ]
-      })
+        const [statsRes, actRes] = await Promise.all([
+          fetch('/api/dashboard/stats'),
+          fetch('/api/activities')
+        ])
+        const sd = await statsRes.json()
+        const ad = await actRes.json()
+        if (sd.success) setStats(sd.stats)
+        if (ad.success) setActivities(ad.activities)
+      } catch (e) { console.error(e) }
       setLoading(false)
     }
-  }, [sampleMode])
+    fetchAll()
+  }, [])
 
-  if (loading || !stats) {
-    return (
-      <div className="flex items-center justify-center h-[500px]">
-        <FiLoader className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    )
-  }
+  if (loading) return <div className="py-12 text-center text-muted-foreground">Loading dashboard...</div>
+  if (!stats) return <div className="py-12 text-center text-destructive">Failed to load dashboard data.</div>
 
-  const donutData = [
-    { name: 'Go', value: stats.signalMix.go, color: 'hsl(142, 71%, 45%)' },
-    { name: 'Reconsider', value: stats.signalMix.reconsider, color: 'hsl(38, 92%, 50%)' },
-    { name: 'No-Go', value: stats.signalMix.noGo, color: 'hsl(0, 84%, 60%)' },
-  ].filter(d => d.value > 0) // Hide empty segments
-
-  const displayDonutData = donutData.length > 0 ? donutData : [{ name: 'Empty', value: 1, color: 'hsl(0, 0%, 20%)' }]
+  const funnelData = [
+    { label: 'Total Leads', val: stats.funnel.total, pct: 100, color: '#3b82f6' },
+    { label: 'Contacted', val: stats.funnel.contacted, pct: stats.funnel.total ? Math.round(stats.funnel.contacted / stats.funnel.total * 100) : 0, color: '#f59e0b' },
+    { label: 'Qualified', val: stats.funnel.qualified, pct: stats.funnel.contacted ? Math.round(stats.funnel.qualified / stats.funnel.contacted * 100) : 0, color: '#10b981' },
+    { label: 'Appointments', val: stats.funnel.appointed, pct: stats.funnel.qualified ? Math.round(stats.funnel.appointed / stats.funnel.qualified * 100) : 0, color: '#8b5cf6' },
+  ]
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground font-serif tracking-tight">Executive Dashboard</h2>
-          <p className="text-sm text-muted-foreground mt-1">Real-time affordability & voice analytics</p>
-        </div>
-        <div className="flex gap-2">
-           <Button onClick={() => onNavigate('affordability')} variant="outline" className="border-primary/20 hover:bg-primary/5">
-             <FiTrendingUp className="w-4 h-4 mr-2" /> Run GharSoch
-           </Button>
-        </div>
-      </div>
-
-      {sampleMode && (
-        <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 flex items-center justify-between animate-in fade-in slide-in-from-top-2 duration-500">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-destructive/20 flex items-center justify-center">
-              <FiAlertCircle className="w-5 h-5 text-destructive" />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-white uppercase tracking-wider">Escalation Alert</p>
-              <p className="text-xs text-muted-foreground">Negative sentiment detected during call with Amit Patel. Requires immediate broker intervention.</p>
-            </div>
-          </div>
-          <Button size="sm" className="bg-destructive text-white hover:bg-destructive/90 px-6">Join Call</Button>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {[
-          { label: 'Active Calls', value: stats.activeCalls, icon: HiOutlinePhone, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
-          { label: 'Calls Today', value: stats.callsToday, icon: FiActivity, color: 'text-blue-400', bg: 'bg-blue-400/10' },
-          { label: 'Avg Sentiment', value: stats.avgSentiment + '%', icon: FiTrendingUp, color: 'text-purple-400', bg: 'bg-purple-400/10' },
-          { label: 'Meetings Booked', value: stats.meetingsBooked, icon: HiOutlineCalendarDays, color: 'text-amber-400', bg: 'bg-amber-400/10' },
-        ].map((s, i) => (
-          <Card key={i} className="border-white/5 bg-card/50 backdrop-blur-sm">
-            <CardContent className="pt-5 pb-4 px-5">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{s.label}</p>
-                  <p className="text-2xl font-bold mt-2 text-white">{s.value}</p>
-                </div>
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${s.bg}`}>
-                  <s.icon className={`w-4 h-4 ${s.color}`} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-
-        <Card className="border-white/5 bg-card/50 backdrop-blur-sm relative overflow-hidden">
-          <div className="absolute top-2 right-2">
-             <PieChart width={60} height={60}>
-               <Pie data={displayDonutData} innerRadius={18} outerRadius={28} dataKey="value" stroke="none">
-                 {displayDonutData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-               </Pie>
-             </PieChart>
-          </div>
-          <CardContent className="pt-5 pb-4 px-5">
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Signal Mix</p>
-            <p className="text-2xl font-bold mt-2 text-white">{stats.signalMix.go}:{stats.signalMix.reconsider}</p>
-            <p className="text-[10px] text-emerald-400 mt-1 uppercase font-bold tracking-tighter">Go : Reconsider</p>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onNavigate('leads')}>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Active Leads</CardTitle>
+            <HiOutlineUserGroup className="w-4 h-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalLeads}</div>
+            <p className="text-xs text-muted-foreground mt-1"><span className="text-emerald-500 font-medium">+{stats.newLeadsToday}</span> today • {stats.hotLeads} hot</p>
+          </CardContent>
+        </Card>
+        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onNavigate('calls')}>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Calls Made</CardTitle>
+            <HiOutlinePhone className="w-4 h-4 text-emerald-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalCalls}</div>
+            <p className="text-xs text-muted-foreground mt-1"><span className="text-emerald-500 font-medium">+{stats.callsToday}</span> today • {Math.round(stats.avgCallDuration / 60)}m avg</p>
+          </CardContent>
+        </Card>
+        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onNavigate('appointments')}>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Appointments</CardTitle>
+            <HiOutlineCalendarDays className="w-4 h-4 text-purple-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.upcomingAppointments}</div>
+            <p className="text-xs text-muted-foreground mt-1">Upcoming • {stats.totalAppointments} total scheduled</p>
+          </CardContent>
+        </Card>
+        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onNavigate('campaigns')}>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Campaigns</CardTitle>
+            <HiOutlineMegaphone className="w-4 h-4 text-amber-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.activeCampaigns}</div>
+            <p className="text-xs text-muted-foreground mt-1">Active out of {stats.totalCampaigns} total</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        <Card className="lg:col-span-3 border-white/5 bg-card/50">
-          <CardHeader className="pb-3 px-6 pt-6">
-            <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-              <FiActivity className="w-4 h-4" /> Live Call Activity
-            </CardTitle>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Funnel */}
+        <Card className="col-span-1 lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2"><FiTrendingUp className="text-primary" /> Conversion Funnel</CardTitle>
           </CardHeader>
-          <CardContent className="px-2">
-             <div className="space-y-1">
-                {stats.recentActivity.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-6">No recent call activity. Trigger a campaign to start calling!</p>
-                ) : (
-                  stats.recentActivity.map((a: any, i: number) => (
-                    <div key={i} className="flex items-center gap-4 px-4 py-3 hover:bg-white/5 rounded-xl transition-all cursor-pointer">
-                      <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center border border-white/5">
-                        <HiOutlinePhone className={`w-4 h-4 ${a.type === 'call' ? 'text-primary' : 'text-muted-foreground'}`} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                         <div className="flex items-center">
-                           <span className="text-sm font-semibold text-white truncate">{a.event}</span>
-                           {signalBadge(a.signal)}
-                         </div>
-                         <div className="flex items-center gap-2 mt-0.5">
-                           <span className="text-[10px] text-muted-foreground">{a.time}</span>
-                           <span className="text-[10px] font-bold uppercase tracking-tighter text-primary">{a.agent}</span>
-                         </div>
-                      </div>
-                      {a.type === 'call' && (
-                        <div className="flex gap-1">
-                          <div className="w-1 h-3 bg-emerald-500 rounded-full" />
-                          <div className="w-1 h-5 bg-emerald-500 rounded-full" />
-                          <div className="w-1 h-2 bg-emerald-500 rounded-full" />
-                        </div>
-                      )}
-                    </div>
-                  ))
-                )}
-             </div>
-             <Button variant="ghost" size="sm" onClick={() => onNavigate('calls')} className="mt-4 ml-4 text-[11px] text-primary hover:text-primary hover:bg-primary/10">
-               View All Call Logs &rarr;
-             </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-2 border-white/5 bg-card/50">
-          <CardHeader className="pb-3 px-6 pt-6">
-            <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-              <FiCpu className="w-4 h-4" /> Agent Health Grid
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4">
-             <div className="grid grid-cols-1 gap-2">
-                {stats.agentsSummary.map((a: any, i: number) => (
-                  <div key={i} className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-white/5 hover:border-primary/20 transition-all">
-                    <div className="flex items-center gap-3">
-                       <div className={`w-2 h-2 rounded-full ${statusColor(a.status)}`} />
-                       <span className="text-xs font-medium text-white">{a.name}</span>
-                    </div>
-                    <div className="text-[10px] font-bold text-muted-foreground">{a.actions} actions</div>
+          <CardContent>
+            <div className="space-y-6 pt-2">
+              {funnelData.map((f, i) => (
+                <div key={f.label} className="relative">
+                  <div className="flex justify-between text-sm mb-1.5 font-medium">
+                    <span>{f.label}</span>
+                    <span className="text-muted-foreground">{f.val} ({f.pct}%)</span>
                   </div>
-                ))}
-             </div>
+                  <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${f.pct}%`, backgroundColor: f.color }} />
+                  </div>
+                  {i < funnelData.length - 1 && <div className="absolute -bottom-4 left-1/2 w-px h-3 bg-border" />}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Activity Feed */}
+        <Card className="col-span-1">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2"><FiActivity className="text-primary" /> Live Activity</CardTitle>
+          </CardHeader>
+          <CardContent className="px-0">
+            <div className="h-[280px] overflow-y-auto px-6 space-y-4">
+              {activities.length === 0 ? <p className="text-xs text-muted-foreground text-center">No recent activity</p> :
+                activities.map((a, i) => (
+                  <div key={i} className="flex gap-3">
+                    <div className="mt-0.5">
+                      {a.icon === 'user' ? <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center"><HiOutlineUserGroup className="w-3.5 h-3.5" /></div> :
+                       a.icon === 'phone' ? <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center"><HiOutlinePhone className="w-3.5 h-3.5" /></div> :
+                       <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center"><HiOutlineCalendarDays className="w-3.5 h-3.5" /></div>}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium leading-tight truncate">{a.title}</p>
+                      <p className="text-xs text-muted-foreground truncate">{a.detail}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{new Date(a.timestamp).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}</p>
+                    </div>
+                  </div>
+                ))
+              }
+            </div>
           </CardContent>
         </Card>
       </div>
