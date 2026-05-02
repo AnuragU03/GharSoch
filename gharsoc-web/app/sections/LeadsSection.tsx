@@ -9,14 +9,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { HiOutlinePlus, HiOutlineMagnifyingGlass, HiOutlineUser } from 'react-icons/hi2'
-import { FiTrash2, FiPhoneCall } from 'react-icons/fi'
+import { FiTrash2, FiPhoneCall, FiInfo } from 'react-icons/fi'
+import { LeadDetailsSheet } from '@/components/LeadDetailsSheet'
 
 interface Lead {
   _id: string; name: string; phone: string; email: string; source: string
   status: string; budget_range: string; location_pref: string; property_type: string
   interest_level: string; qualification_status: string; lead_score: number
   total_calls: number; dnd_status: boolean; notes: string; timeline: string
-  created_at: string
+  objections: string; created_at: string; next_follow_up_date: string
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -35,6 +36,11 @@ export default function LeadsSection() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [showAdd, setShowAdd] = useState(false)
   const [callingId, setCallingId] = useState<string | null>(null)
+  
+  // Lead Details State
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+  const [sheetOpen, setSheetOpen] = useState(false)
+
   const [form, setForm] = useState({ name: '', phone: '', email: '', source: '', budget_range: '', location_pref: '', property_type: '', notes: '', timeline: '' })
 
   const fetchLeads = useCallback(async () => {
@@ -71,6 +77,11 @@ export default function LeadsSection() {
       alert(d.success ? `Call triggered! ID: ${d.callId}` : `Failed: ${d.error}`)
     } catch { alert('Failed to trigger call') }
     setCallingId(null)
+  }
+
+  const openLeadDetails = (lead: Lead) => {
+    setSelectedLead(lead)
+    setSheetOpen(true)
   }
 
   return (
@@ -137,7 +148,7 @@ export default function LeadsSection() {
             {loading ? <tr><td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">Loading...</td></tr>
             : leads.length === 0 ? <tr><td colSpan={9} className="px-4 py-8 text-center text-muted-foreground"><HiOutlineUser className="w-8 h-8 mx-auto mb-2 opacity-30" />No leads found.</td></tr>
             : leads.map(l => (
-              <tr key={l._id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
+              <tr key={l._id} className="border-b border-border/50 hover:bg-muted/20 transition-colors cursor-pointer" onClick={() => openLeadDetails(l)}>
                 <td className="px-4 py-3"><div className="font-medium">{l.name}</div><div className="text-xs text-muted-foreground">{l.email}</div></td>
                 <td className="px-4 py-3 text-muted-foreground">{l.phone}</td>
                 <td className="px-4 py-3"><Badge variant="outline" style={{ borderColor: STATUS_COLORS[l.status], color: STATUS_COLORS[l.status] }}>{l.status}</Badge></td>
@@ -146,7 +157,8 @@ export default function LeadsSection() {
                 <td className="px-4 py-3 text-xs text-muted-foreground">{l.budget_range || '—'}</td>
                 <td className="px-4 py-3 text-xs text-muted-foreground">{l.location_pref || '—'}</td>
                 <td className="px-4 py-3 text-xs text-muted-foreground">{l.total_calls}</td>
-                <td className="px-4 py-3 text-right"><div className="flex items-center justify-end gap-1">
+                <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}><div className="flex items-center justify-end gap-1">
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openLeadDetails(l)}><FiInfo className="w-4 h-4 text-primary" /></Button>
                   <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleCall(l)} disabled={callingId === l._id}><FiPhoneCall className="w-3.5 h-3.5" style={{ color: 'hsl(25,70%,45%)' }} /></Button>
                   <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDelete(l._id)}><FiTrash2 className="w-3.5 h-3.5 text-muted-foreground" /></Button>
                 </div></td>
@@ -155,6 +167,8 @@ export default function LeadsSection() {
           </tbody>
         </table>
       </div>
+
+      <LeadDetailsSheet lead={selectedLead} open={sheetOpen} onOpenChange={setSheetOpen} />
     </div>
   )
 }

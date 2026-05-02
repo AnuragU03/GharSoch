@@ -512,3 +512,28 @@ When Vapi calls your webhook with a tool-call, here's what each tool does on the
 | `confirm_appointment` | `updateOne({ status: 'confirmed' })` | `appointments` |
 | `reschedule_appointment` | `updateOne({ scheduled_at, status })` | `appointments` |
 | `cancel_appointment` | `updateOne({ status: 'cancelled' })` | `appointments` |
+
+---
+
+## Local Development (Testing Webhooks)
+
+If you are running the GharSoch application locally (e.g., `localhost:3000`) and want to test Vapi calls, Vapi's servers cannot reach your `localhost` directly. You must expose your local server to the internet using a tool like **ngrok**.
+
+1. **Install ngrok:** Download it from [ngrok.com](https://ngrok.com/) or install via npm: 
+   ```bash
+   npm install -g ngrok
+   ```
+2. **Start your local server:** Make sure your app is running.
+   ```bash
+   npm run dev
+   ```
+3. **Start ngrok:** In a new terminal window, forward port 3000 (or whichever port you are using):
+   ```bash
+   ngrok http 3000
+   ```
+4. **Copy the ngrok URL:** Ngrok will give you a public Forwarding URL that looks something like `https://a1b2-c3d4.ngrok-free.app`.
+5. **Update Vapi Dashboard:** Go to your Assistant's settings in the Vapi Dashboard and temporarily change the **Server URL** from `https://gharsoch.tech/api/vapi/webhook` to:
+   `https://a1b2-c3d4.ngrok-free.app/api/vapi/webhook`
+
+> [!WARNING]
+> Every time you restart ngrok on the free tier, the URL changes. You will need to update the Server URL in the Vapi dashboard every time you restart ngrok. Don't forget to change it back to the `gharsoch.tech` production URL when you deploy!
