@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCollection } from '@/lib/mongodb'
 import OpenAI from 'openai'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   try {
     const openai = new OpenAI({
@@ -94,9 +96,12 @@ export async function POST(request: NextRequest) {
     // Process matches
     for (const match of matches) {
       if (match.match_score >= 75) {
-        // Upgrade the Client to a Lead
+        const { ObjectId } = require('mongodb')
+        const clientObjId = ObjectId.createFromHexString(match.client_id)
+
+        // Update the lead record with match info
         await leadsCollection.updateOne(
-          { _id: require('mongodb').ObjectId.createFromHexString(match.client_id) },
+          { _id: clientObjId },
           {
             $set: {
               qualification_status: 'matched',
@@ -107,6 +112,24 @@ export async function POST(request: NextRequest) {
             }
           }
         )
+
+        // Also update the clients collection entry if it exists
+        const clientsCollection = await getCollection('clients')
+        await clientsCollection.updateOne(
+          { _id: clientObjId },
+          {
+            $set: {
+              status: 'matched',
+              ai_match_status: 'matched',
+              matched_property_id: match.property_id,
+              matched_property_title: properties.find(p => p._id.toString() === match.property_id)?.title || match.property_id,
+              match_score: match.match_score,
+              match_reason: match.match_reason,
+              updated_at: new Date()
+            }
+          }
+        )
+
         updatedCount++
         console.log(`[AI Matchmaker] Matched client ${match.client_id} to property ${match.property_id}`)
       }

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCollection } from '@/lib/mongodb'
 import { triggerCampaignCall } from '@/lib/vapiClient'
 
+export const dynamic = 'force-dynamic'
+
 // This endpoint should be triggered by a Cron job (e.g., weekly) to revive dead leads
 export async function GET(request: NextRequest) {
   try {

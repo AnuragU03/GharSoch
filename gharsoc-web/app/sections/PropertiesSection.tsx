@@ -7,8 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { HiOutlinePlus, HiOutlineMagnifyingGlass, HiOutlineHome } from 'react-icons/hi2'
+import { HiOutlinePlus, HiOutlineMagnifyingGlass, HiOutlineHome, HiOutlineCurrencyRupee } from 'react-icons/hi2'
 import { FiTrash2 } from 'react-icons/fi'
+import { AiOutlineLoading3Quarters } from 'react-icons/ai'
 
 interface Property { _id: string; title: string; type: string; location: string; price: number; area_sqft: number; bedrooms: number; status: string; builder: string; images: string[]; description: string; created_at: string }
 
@@ -19,6 +20,8 @@ export default function PropertiesSection() {
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [form, setForm] = useState({ title: '', type: '', location: '', price: '', area_sqft: '', bedrooms: '', builder: '', description: '', status: 'available' })
+  const [priceDropLoading, setPriceDropLoading] = useState<string | null>(null)
+  const [priceDropResult, setPriceDropResult] = useState<{ id: string; success: boolean } | null>(null)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -36,6 +39,25 @@ export default function PropertiesSection() {
   }
 
   const handleDelete = async (id: string) => { if (!confirm('Delete?')) return; await fetch(`/api/properties?id=${id}`, { method: 'DELETE' }); fetchData() }
+
+  const handlePriceDrop = async (property: Property) => {
+    if (!confirm(`Trigger AI Price Drop campaign for "${property.title}"? This will notify all budget-sensitive leads.`)) return
+    setPriceDropLoading(property._id)
+    setPriceDropResult(null)
+    try {
+      const res = await fetch('/api/agent/price-drop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ property_id: property._id, new_price: property.price }),
+      })
+      const data = await res.json()
+      setPriceDropResult({ id: property._id, success: data.success })
+      setTimeout(() => setPriceDropResult(null), 5000)
+    } catch {
+      setPriceDropResult({ id: property._id, success: false })
+    }
+    setPriceDropLoading(null)
+  }
 
   const formatPrice = (p: number) => p >= 10000000 ? `₹${(p / 10000000).toFixed(1)} Cr` : `₹${(p / 100000).toFixed(0)} L`
 
@@ -92,7 +114,20 @@ export default function PropertiesSection() {
                 <span>{p.bedrooms} BHK</span>
               </div>
               {p.builder && <p className="text-[11px] text-muted-foreground">by {p.builder}</p>}
-              <div className="flex justify-end pt-1">
+              <div className="flex justify-between items-center pt-1">
+                <button
+                  onClick={(e) => { e.stopPropagation(); handlePriceDrop(p) }}
+                  disabled={priceDropLoading === p._id}
+                  title="Trigger AI Price Drop campaign"
+                  className="flex items-center gap-1 text-[11px] font-medium text-rose-500 hover:bg-rose-50 px-2 py-1 rounded transition-colors disabled:opacity-50"
+                >
+                  {priceDropLoading === p._id
+                    ? <AiOutlineLoading3Quarters className="w-3 h-3 animate-spin" />
+                    : <HiOutlineCurrencyRupee className="w-3.5 h-3.5" />}
+                  {priceDropResult?.id === p._id
+                    ? priceDropResult.success ? '✓ Campaign Triggered!' : '✗ Failed'
+                    : 'Price Drop Alert'}
+                </button>
                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDelete(p._id)}><FiTrash2 className="w-3.5 h-3.5 text-muted-foreground" /></Button>
               </div>
             </div>

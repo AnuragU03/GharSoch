@@ -1,9 +1,9 @@
 'use client'
 import React, { useState } from 'react'
-import { HiOutlineHome, HiOutlineUserGroup, HiOutlinePhone, HiOutlineCalendarDays, HiOutlineMegaphone, HiOutlineCog6Tooth, HiOutlineChartBar } from 'react-icons/hi2'
+import { HiOutlineHome, HiOutlineUserGroup, HiOutlineUserPlus, HiOutlinePhone, HiOutlineCalendarDays, HiOutlineMegaphone, HiOutlineCog6Tooth, HiOutlineChartBar } from 'react-icons/hi2'
 import { FiCommand } from 'react-icons/fi'
 
-export type ScreenId = 'dashboard' | 'leads' | 'properties' | 'appointments' | 'calls' | 'campaigns' | 'agent_ops' | 'analytics' | 'settings'
+export type ScreenId = 'dashboard' | 'leads' | 'clients' | 'properties' | 'appointments' | 'calls' | 'campaigns' | 'agent_ops' | 'analytics' | 'settings'
 
 interface SidebarProps {
   activeScreen: ScreenId
@@ -13,6 +13,7 @@ interface SidebarProps {
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: HiOutlineHome },
   { id: 'leads', label: 'Leads Pipeline', icon: HiOutlineUserGroup },
+  { id: 'clients', label: 'Clients', icon: HiOutlineUserPlus },
   { id: 'properties', label: 'Properties', icon: HiOutlineHome },
   { id: 'appointments', label: 'Appointments', icon: HiOutlineCalendarDays },
   { id: 'calls', label: 'Call Logs', icon: HiOutlinePhone },

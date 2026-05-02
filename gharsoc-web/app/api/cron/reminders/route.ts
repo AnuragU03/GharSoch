@@ -3,6 +3,8 @@ import { getCollection } from '@/lib/mongodb'
 import { triggerReminderCall } from '@/lib/vapiClient'
 import { ObjectId } from 'mongodb'
 
+export const dynamic = 'force-dynamic'
+
 // This endpoint should be triggered by a Cron job every morning at 9:00 AM
 export async function GET(request: NextRequest) {
   try {

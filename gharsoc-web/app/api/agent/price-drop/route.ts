@@ -3,6 +3,8 @@ import { getCollection } from '@/lib/mongodb'
 import { triggerCampaignCall } from '@/lib/vapiClient'
 import { ObjectId } from 'mongodb'
 
+export const dynamic = 'force-dynamic'
+
 // This endpoint should be triggered when a property price is lowered
 export async function POST(request: NextRequest) {
   try {

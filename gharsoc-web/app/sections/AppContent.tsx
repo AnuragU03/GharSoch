@@ -11,11 +11,13 @@ import CampaignsSection from './CampaignsSection'
 import AnalyticsSection from './AnalyticsSection'
 import SettingsSection from './SettingsSection'
 import AgentActivitySection from './AgentActivitySection'
+import ClientsSection from './ClientsSection'
 import { VoiceSessionProvider, useVoice } from './VoiceSessionProvider'
 
 const SCREEN_TITLES: Record<ScreenId, string> = {
   dashboard: 'Dashboard Overview',
   leads: 'Lead Pipeline',
+  clients: 'Client Prospects',
   properties: 'Property Listings',
   appointments: 'Appointments & Viewings',
   calls: 'Call Activity Logs',
@@ -56,6 +58,7 @@ function AppLayout() {
     switch (activeScreen) {
       case 'dashboard': return <DashboardSection onNavigate={(s) => setActiveScreen(s as ScreenId)} />
       case 'leads': return <LeadsSection />
+      case 'clients': return <ClientsSection />
       case 'properties': return <PropertiesSection />
       case 'appointments': return <AppointmentsSection />
       case 'calls': return <CallLogsSection />

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCollection } from '@/lib/mongodb'
 import { triggerCampaignCall } from '@/lib/vapiClient'
 
+export const dynamic = 'force-dynamic'
+
 // Secure cron job execution
 // In production, this should be protected by an API key or cron secret.
 export async function GET(request: NextRequest) {
