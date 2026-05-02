@@ -1,3 +1,6 @@
 *.ps1
 .env
 .env.*
+*BRD*
+*PRD*
+*.docx
