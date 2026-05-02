@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getCollection } from '@/lib/db'
+import { getCollection } from '@/lib/mongodb'
 import OpenAI from 'openai'
 
 const openai = new OpenAI({

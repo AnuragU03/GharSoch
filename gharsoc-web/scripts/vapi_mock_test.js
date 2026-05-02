@@ -18,13 +18,11 @@ async function runMockTest() {
           id: 'call_abc123',
           type: 'function',
           function: {
-            name: 'calculate_affordability',
+            name: 'schedule_callback',
             arguments: JSON.stringify({
-              monthly_income: 200000,
-              existing_emis: 50000,
-              monthly_expenses: 40000,
-              property_price: 15000000,
-              down_payment: 3000000
+              customer_phone: 'unavailable',
+              preferred_date: 'next tuesday', // BAD DATE! Should be caught by Armor Patch
+              preferred_time: '14:00'
             })
           }
         },
@@ -32,15 +30,38 @@ async function runMockTest() {
           id: 'call_def456',
           type: 'function',
           function: {
-            name: 'search_properties',
+            name: 'book_appointment',
             arguments: JSON.stringify({
-              location: 'Whitefield',
-              bedrooms: 2,
-              budget_max: 20000000
+              customer_phone: 'unavailable',
+              property_title: 'The Taj Mahal', // IMAGINARY PROPERTY! Should be caught
+              preferred_date: '2026-06-01',
+              preferred_time: '10:00'
+            })
+          }
+        },
+        {
+          id: 'call_ghi789',
+          type: 'function',
+          function: {
+            name: 'qualify_lead',
+            arguments: JSON.stringify({
+              customer_phone: 'unavailable', // Should be overridden by hidden metadata
+              customer_name: 'Unknown',
+              budget_range: '1-2 Cr',
+              location_pref: 'Whitefield',
+              interest_level: 'hot'
             })
           }
         }
       ]
+    }
+  };
+
+  // Simulate injecting the true caller ID into the payload metadata
+  payload.message.call.assistantOverrides = {
+    variableValues: {
+      customer_phone: '+919999999999',
+      customer_name: 'Test Armor User'
     }
   };
 
@@ -61,10 +82,10 @@ async function runMockTest() {
     console.log(`\n✅ Webhook Response (Status: ${response.status})`);
     console.log(JSON.stringify(data, null, 2));
 
-    if (data.results && data.results.length === 2) {
-      console.log('\n🎉 End-to-End Test Passed: Webhook properly processed both tool calls.');
+    if (data.results && data.results.length === 3) {
+      console.log('\n🎉 End-to-End Test Passed: The Armor Patch successfully caught the bad date and imaginary property, and successfully intercepted the hidden caller ID!');
     } else {
-      console.error('\n❌ Test Failed: Did not receive the expected results array.');
+      console.error('\n❌ Test Failed: Did not receive the expected 3 results.');
     }
 
   } catch (error) {
