@@ -150,6 +150,27 @@ export async function POST(request: NextRequest) {
               break
             }
 
+            case 'schedule_callback': {
+              const leads = await getCollection('leads')
+              const scheduledAt = new Date(args.preferred_date)
+              if (args.preferred_time) {
+                const [hours, minutes] = args.preferred_time.split(':').map(Number)
+                if (!isNaN(hours)) scheduledAt.setHours(hours, minutes || 0)
+              }
+              
+              const result = await leads.updateOne(
+                { phone: args.customer_phone },
+                { $set: { next_follow_up_date: scheduledAt, status: 'follow_up', updated_at: new Date() } }
+              )
+
+              if (result.matchedCount === 0) {
+                 resultData = { error: 'Lead not found to schedule callback' }
+              } else {
+                 resultData = { status: 'scheduled', message: `Callback scheduled for ${scheduledAt.toLocaleString()}` }
+              }
+              break
+            }
+
             case 'mark_dnd': {
               const leads = await getCollection('leads')
               await leads.updateMany(

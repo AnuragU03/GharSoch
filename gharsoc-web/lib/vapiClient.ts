@@ -102,6 +102,7 @@ export async function triggerCampaignCall(lead: {
     customerName: lead.name,
     metadata: {
       customer_name: lead.name,
+      customer_phone: lead.phone,
       budget_range: lead.budget_range || 'Not specified',
       location_pref: lead.location_pref || 'Not specified',
       property_type: lead.property_type || 'Not specified',

@@ -16,7 +16,7 @@ Create these in the **Vapi Dashboard → Assistants → Create Assistant**.
 | **Model** | `gpt-4o` |
 | **Provider** | `OpenAI` |
 | **Voice** | `eleven_labs` → `Rachel` (or any Indian English female voice) |
-| **First Message** | *(see below — dynamically injected per call)* |
+| **First Message** | *(Leave blank - the AI will generate it dynamically)* |
 | **Server URL** | `https://gharsoch.tech/api/vapi/webhook` |
 | **End Call After Silence** | `10 seconds` |
 | **Max Duration** | `300 seconds` (5 min) |
@@ -193,7 +193,36 @@ The following customer information has been pre-loaded from our database:
 }
 ```
 
-#### Tool 4: `mark_dnd`
+#### Tool 4: `schedule_callback`
+```json
+{
+  "type": "function",
+  "function": {
+    "name": "schedule_callback",
+    "description": "Schedule a callback for a lead. Call this when the customer asks to be called back later or at a specific time.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "customer_phone": {
+          "type": "string",
+          "description": "Customer's phone number"
+        },
+        "preferred_date": {
+          "type": "string",
+          "description": "Preferred date for callback (ISO format or natural language like 'tomorrow' or 'today')"
+        },
+        "preferred_time": {
+          "type": "string",
+          "description": "Preferred time for callback (e.g., '14:00' or 'in 1 hour')"
+        }
+      },
+      "required": ["customer_phone", "preferred_date"]
+    }
+  }
+}
+```
+
+#### Tool 5: `mark_dnd`
 ```json
 {
   "type": "function",
@@ -317,7 +346,7 @@ Uses the same tools as Arya Outbound PLUS:
 | **Model** | `gpt-4o` |
 | **Provider** | `OpenAI` |
 | **Voice** | `eleven_labs` → `Rachel` |
-| **First Message** | *(dynamically injected per call)* |
+| **First Message** | *(Leave blank - the AI will generate it dynamically)* |
 | **Server URL** | `https://gharsoch.tech/api/vapi/webhook` |
 | **Max Duration** | `120 seconds` (2 min) |
 

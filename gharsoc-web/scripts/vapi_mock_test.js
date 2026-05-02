@@ -8,7 +8,7 @@
 async function runMockTest() {
   const webhookUrl = 'http://localhost:3333/api/vapi/webhook';
   
-  // Simulated Vapi Payload
+  // Simulated Vapi Payload for Arya tools
   const payload = {
     message: {
       type: 'tool-calls',
@@ -20,9 +20,11 @@ async function runMockTest() {
           function: {
             name: 'calculate_affordability',
             arguments: JSON.stringify({
-              income: 200000,
-              expenses: 50000,
-              propertyPrice: 10000000
+              monthly_income: 200000,
+              existing_emis: 50000,
+              monthly_expenses: 40000,
+              property_price: 15000000,
+              down_payment: 3000000
             })
           }
         },
@@ -30,10 +32,11 @@ async function runMockTest() {
           id: 'call_def456',
           type: 'function',
           function: {
-            name: 'check_calendar_availability',
+            name: 'search_properties',
             arguments: JSON.stringify({
-              timeMin: new Date().toISOString(),
-              timeMax: new Date(Date.now() + 86400000).toISOString() // +24 hours
+              location: 'Whitefield',
+              bedrooms: 2,
+              budget_max: 20000000
             })
           }
         }
