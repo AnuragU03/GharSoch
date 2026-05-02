@@ -248,13 +248,20 @@ response_schemas/           # Agent response schemas
 }
 ```
 
+## Recent Production Updates
+- **Azure Cosmos DB Support:** Upgraded MongoDB driver for full compatibility with Cosmos DB API v4.2+. Implemented custom indexing scripts for high-performance sorting.
+- **Vapi.ai Voice Infrastructure:** Transitioned telephony to Vapi.ai for sub-second conversational AI. Built seamless webhook pipelines for dynamic lead updates.
+- **Smart Callbacks:** Added native `schedule_callback` functionality directly to the Outbound AI Assistant to prevent duplicate 'Unknown' leads and schedule automated follow-ups.
+- **Campaign Orchestrator:** Fixed bulk outbound calling sequences to properly cycle through targeted leads while respecting TRAI DND regulations.
+
 ## Getting Started
 
 ### Prerequisites
 - Node.js 18+
 - npm or yarn
-- MongoDB database
-- Lyzr API key
+- MongoDB database (Or Azure Cosmos DB with MongoDB API v4.2+)
+- Vapi.ai Account & API Key
+- Twilio Account (For Phone Numbers & Geolocation Routing)
 
 ### Installation
 
@@ -271,14 +278,21 @@ response_schemas/           # Agent response schemas
 
 3. **Environment Configuration**
    
-   Create a `.env.local` file in the root directory:
+   Create a `.env` file in the root directory:
    ```env
-   LYZR_API_KEY=your-lyzr-api-key-here
-   DATABASE_URL=mongodb://localhost:27017/arya-voice-agent
-   APP_JWT_SECRET=your-jwt-secret-here
+   VAPI_API_KEY=your-vapi-api-key
+   VAPI_PHONE_NUMBER_ID=your-vapi-phone-id
+   OPENAI_API_KEY=your-openai-key
+   DATABASE_URL=mongodb+srv://...
    ```
 
-4. **Run the development server**
+4. **Initialize Database Indexes**
+   *(Required for Cosmos DB support)*
+   ```bash
+   node scripts/create_indexes.js
+   ```
+
+5. **Run the development server**
    ```bash
    npm run dev
    ```
@@ -332,9 +346,10 @@ npm start
 - **Icons**: Lucide React
 - **Forms**: React Hook Form, Zod
 - **Charts**: Recharts
-- **Database**: MongoDB (via lyzr-architect)
-- **AI Agents**: Lyzr Platform
-- **Voice**: OpenAI GPT-4.1
+- **Database**: Azure Cosmos DB (MongoDB API v4.2+)
+- **Voice AI Infrastructure**: Vapi.ai
+- **LLM**: OpenAI GPT-4o
+- **Telephony Provider**: Twilio
 
 ## License
 
