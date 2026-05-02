@@ -99,6 +99,14 @@ export async function POST(request: NextRequest) {
       await new Promise(resolve => setTimeout(resolve, 1000))
     }
 
+    const agentLogsCollection = await getCollection('agent_logs')
+    await agentLogsCollection.insertOne({
+      agent_name: 'The Price Drop Negotiator',
+      action: `Scanned ${targetLeads.length} leads with budget objections for ${property.title}. Triggered ${triggeredCount} negotiation calls.`,
+      status: 'success',
+      created_at: new Date()
+    })
+
     return NextResponse.json({
       success: true,
       message: `Triggered ${triggeredCount} price drop negotiation calls`,

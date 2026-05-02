@@ -15,19 +15,23 @@ interface DashStats {
 export default function DashboardSection({ onNavigate }: { onNavigate: (s: string) => void }) {
   const [stats, setStats] = useState<DashStats | null>(null)
   const [activities, setActivities] = useState<any[]>([])
+  const [agentLogs, setAgentLogs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const [statsRes, actRes] = await Promise.all([
+        const [statsRes, actRes, agentRes] = await Promise.all([
           fetch('/api/dashboard/stats'),
-          fetch('/api/activities')
+          fetch('/api/activities'),
+          fetch('/api/agent-activities')
         ])
         const sd = await statsRes.json()
         const ad = await actRes.json()
+        const agd = await agentRes.json()
         if (sd.success) setStats(sd.stats)
         if (ad.success) setActivities(ad.activities)
+        if (agd.success) setAgentLogs(agd.data || [])
       } catch (e) { console.error(e) }
       setLoading(false)
     }
@@ -44,8 +48,43 @@ export default function DashboardSection({ onNavigate }: { onNavigate: (s: strin
     { label: 'Appointments', val: stats.funnel.appointed, pct: stats.funnel.qualified ? Math.round(stats.funnel.appointed / stats.funnel.qualified * 100) : 0, color: '#8b5cf6' },
   ]
 
+  const latestAgentLog = agentLogs.length > 0 ? agentLogs[0] : null
+
   return (
     <div className="space-y-6">
+      {/* AI Pulse Pro-Max Banner */}
+      <div 
+        className="w-full relative overflow-hidden rounded-xl border border-primary/20 bg-card cursor-pointer group"
+        onClick={() => onNavigate('agent_ops')}
+      >
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-transparent to-transparent opacity-50"></div>
+        <div className="relative p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="relative flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 border border-primary/30 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-20"></span>
+              <FiActivity className="w-5 h-5 text-primary relative z-10" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                Autonomous AI Systems Online
+                <span className="text-[10px] font-bold tracking-widest uppercase bg-emerald-500/10 text-emerald-500 px-2 py-0.5 rounded border border-emerald-500/20">Optimal Health</span>
+              </h3>
+              {latestAgentLog ? (
+                <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
+                  <span className="text-primary font-medium">{latestAgentLog.agent_name}</span> completed at {new Date(latestAgentLog.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}: <span className="text-muted-foreground/80">{latestAgentLog.action}</span>
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground mt-1">Background agents are standing by. Awaiting scheduled CRON triggers...</p>
+              )}
+            </div>
+          </div>
+          <button className="shrink-0 text-sm font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors px-4 py-2 rounded-lg border border-primary/20 flex items-center gap-2 group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary">
+            View Live Logs
+            <span className="group-hover:translate-x-1 transition-transform">→</span>
+          </button>
+        </div>
+      </div>
+
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onNavigate('leads')}>

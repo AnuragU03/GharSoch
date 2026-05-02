@@ -3,7 +3,7 @@ import React, { useState } from 'react'
 import { HiOutlineHome, HiOutlineUserGroup, HiOutlinePhone, HiOutlineCalendarDays, HiOutlineMegaphone, HiOutlineCog6Tooth, HiOutlineChartBar } from 'react-icons/hi2'
 import { FiCommand } from 'react-icons/fi'
 
-export type ScreenId = 'dashboard' | 'leads' | 'properties' | 'appointments' | 'calls' | 'campaigns' | 'analytics' | 'settings'
+export type ScreenId = 'dashboard' | 'leads' | 'properties' | 'appointments' | 'calls' | 'campaigns' | 'agent_ops' | 'analytics' | 'settings'
 
 interface SidebarProps {
   activeScreen: ScreenId
@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { id: 'appointments', label: 'Appointments', icon: HiOutlineCalendarDays },
   { id: 'calls', label: 'Call Logs', icon: HiOutlinePhone },
   { id: 'campaigns', label: 'Campaigns', icon: HiOutlineMegaphone },
+  { id: 'agent_ops', label: 'AI Operations', icon: FiCommand },
   { id: 'analytics', label: 'Analytics', icon: HiOutlineChartBar },
   { id: 'settings', label: 'Settings', icon: HiOutlineCog6Tooth },
 ] as const

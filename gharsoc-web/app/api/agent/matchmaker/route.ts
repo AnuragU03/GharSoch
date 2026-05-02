@@ -113,6 +113,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const agentLogsCollection = await getCollection('agent_logs')
+    await agentLogsCollection.insertOne({
+      agent_name: 'The Matchmaker',
+      action: `Scanned ${clientData.length} clients. Found ${updatedCount} matches.`,
+      status: 'success',
+      created_at: new Date()
+    })
+
     return NextResponse.json({
       success: true,
       message: `Matchmaker run complete. Found ${updatedCount} matches out of ${clientData.length} clients.`,

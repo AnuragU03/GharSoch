@@ -148,8 +148,8 @@ export default function LeadsSection() {
             {loading ? <tr><td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">Loading...</td></tr>
             : leads.length === 0 ? <tr><td colSpan={9} className="px-4 py-8 text-center text-muted-foreground"><HiOutlineUser className="w-8 h-8 mx-auto mb-2 opacity-30" />No leads found.</td></tr>
             : leads.map(l => (
-              <tr key={l._id} className="border-b border-border/50 hover:bg-muted/20 transition-colors cursor-pointer" onClick={() => openLeadDetails(l)}>
-                <td className="px-4 py-3"><div className="font-medium">{l.name}</div><div className="text-xs text-muted-foreground">{l.email}</div></td>
+              <tr key={l._id} className="border-b border-border/50 hover:bg-muted/30 transition-all cursor-pointer group" onClick={() => openLeadDetails(l)}>
+                <td className="px-4 py-3"><div className="font-medium group-hover:text-primary transition-colors">{l.name}</div><div className="text-xs text-muted-foreground">{l.email}</div></td>
                 <td className="px-4 py-3 text-muted-foreground">{l.phone}</td>
                 <td className="px-4 py-3"><Badge variant="outline" style={{ borderColor: STATUS_COLORS[l.status], color: STATUS_COLORS[l.status] }}>{l.status}</Badge></td>
                 <td className="px-4 py-3"><span className="text-xs font-medium flex items-center gap-1" style={{ color: INTEREST_COLORS[l.interest_level] || '#6b7280' }}><span className="w-1.5 h-1.5 rounded-full" style={{ background: INTEREST_COLORS[l.interest_level] || '#6b7280' }} />{l.interest_level}</span></td>

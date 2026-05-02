@@ -10,6 +10,7 @@ import CallLogsSection from './CallLogsSection'
 import CampaignsSection from './CampaignsSection'
 import AnalyticsSection from './AnalyticsSection'
 import SettingsSection from './SettingsSection'
+import AgentActivitySection from './AgentActivitySection'
 import { VoiceSessionProvider, useVoice } from './VoiceSessionProvider'
 
 const SCREEN_TITLES: Record<ScreenId, string> = {
@@ -19,6 +20,7 @@ const SCREEN_TITLES: Record<ScreenId, string> = {
   appointments: 'Appointments & Viewings',
   calls: 'Call Activity Logs',
   campaigns: 'Outbound Campaigns',
+  agent_ops: 'AI Operations Center',
   analytics: 'Analytics & Performance',
   settings: 'System Settings',
 }
@@ -58,6 +60,7 @@ function AppLayout() {
       case 'appointments': return <AppointmentsSection />
       case 'calls': return <CallLogsSection />
       case 'campaigns': return <CampaignsSection />
+      case 'agent_ops': return <AgentActivitySection />
       case 'analytics': return <AnalyticsSection />
       case 'settings': return <SettingsSection />
       default: return <DashboardSection onNavigate={(s) => setActiveScreen(s as ScreenId)} />

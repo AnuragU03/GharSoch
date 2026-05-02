@@ -86,6 +86,14 @@ export async function GET(request: NextRequest) {
       await new Promise(resolve => setTimeout(resolve, 1000))
     }
 
+    const agentLogsCollection = await getCollection('agent_logs')
+    await agentLogsCollection.insertOne({
+      agent_name: 'The Follow-Up Agent',
+      action: `Scanned ${dueFollowUps.length} due follow-ups. Triggered ${triggeredCount} calls.`,
+      status: 'success',
+      created_at: new Date()
+    })
+
     return NextResponse.json({
       success: true,
       message: `Triggered ${triggeredCount} follow-up calls`,
