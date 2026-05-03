@@ -31,6 +31,13 @@ export async function GET(request: NextRequest) {
     }).toArray()
 
     if (dueAppointments.length === 0) {
+      const agentLogsCollection = await getCollection('agent_logs')
+      await agentLogsCollection.insertOne({
+        agent_name: 'Appointment Guardian',
+        action: 'Scan complete. No upcoming appointments in the next 48 hours need reminders.',
+        status: 'success',
+        created_at: new Date()
+      })
       return NextResponse.json({ success: true, message: 'No upcoming appointments found for reminders', triggered: 0 })
     }
 

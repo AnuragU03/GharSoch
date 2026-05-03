@@ -33,6 +33,13 @@ export async function GET(request: NextRequest) {
     }).limit(50).toArray() // Limit to 50 at a time to avoid overwhelming the system/billing
 
     if (deadLeads.length === 0) {
+      const agentLogsCollection = await getCollection('agent_logs')
+      await agentLogsCollection.insertOne({
+        agent_name: 'Dead Lead Re-engager',
+        action: 'Scan complete. No dead leads (60+ days) found eligible for re-engagement.',
+        status: 'success',
+        created_at: new Date()
+      })
       return NextResponse.json({ success: true, message: 'No dead leads found eligible for re-engagement', triggered: 0 })
     }
 

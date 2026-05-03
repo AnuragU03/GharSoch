@@ -31,6 +31,13 @@ export async function GET(request: NextRequest) {
     }).toArray()
 
     if (dueFollowUps.length === 0) {
+      const agentLogsCollection = await getCollection('agent_logs')
+      await agentLogsCollection.insertOne({
+        agent_name: 'Auto Follow-Up',
+        action: 'Scan complete. No follow-ups are due at this time.',
+        status: 'success',
+        created_at: new Date()
+      })
       return NextResponse.json({ success: true, message: 'No due follow-ups found', triggered: 0 })
     }
 

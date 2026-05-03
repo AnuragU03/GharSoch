@@ -26,6 +26,13 @@ export async function POST(request: NextRequest) {
     }).toArray()
 
     if (clients.length === 0) {
+      const agentLogsCollection = await getCollection('agent_logs')
+      await agentLogsCollection.insertOne({
+        agent_name: 'The Matchmaker',
+        action: 'Scan complete. No new unmatched clients found in the pipeline.',
+        status: 'success',
+        created_at: new Date()
+      })
       return NextResponse.json({ success: true, message: 'No unmatched clients found.' })
     }
 
@@ -35,6 +42,13 @@ export async function POST(request: NextRequest) {
     }).toArray()
 
     if (properties.length === 0) {
+      const agentLogsCollection = await getCollection('agent_logs')
+      await agentLogsCollection.insertOne({
+        agent_name: 'The Matchmaker',
+        action: `Scan complete. Found ${clients.length} clients to match but no available properties in inventory.`,
+        status: 'success',
+        created_at: new Date()
+      })
       return NextResponse.json({ success: true, message: 'No available properties to match against.' })
     }
 
