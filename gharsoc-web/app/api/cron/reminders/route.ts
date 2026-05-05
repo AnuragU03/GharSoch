@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     if (dueAppointments.length === 0) {
       const agentLogsCollection = await getCollection('agent_logs')
       await agentLogsCollection.insertOne({
-        agent_name: 'Appointment Guardian',
+        agent_name: 'The Appointment Guardian',
         action: 'Scan complete. No upcoming appointments in the next 48 hours need reminders.',
         status: 'success',
         created_at: new Date()

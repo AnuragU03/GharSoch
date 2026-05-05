@@ -26,10 +26,13 @@ const VAPI_PHONE_NUMBER_ID = process.env.VAPI_PHONE_NUMBER_ID || ''
  */
 export async function triggerOutboundCall(params: TriggerCallParams): Promise<VapiCallResponse> {
   if (!VAPI_API_KEY) {
-    return { success: false, error: 'VAPI_API_KEY not configured' }
+    return { success: false, error: 'VAPI_API_KEY not configured - please set up your Vapi API key' }
   }
   if (!VAPI_PHONE_NUMBER_ID) {
-    return { success: false, error: 'VAPI_PHONE_NUMBER_ID not configured' }
+    return { success: false, error: 'VAPI_PHONE_NUMBER_ID not configured - please import your Twilio number into Vapi' }
+  }
+  if (!params.assistantId) {
+    return { success: false, error: 'Assistant ID not configured - please create your assistants in the Vapi dashboard' }
   }
 
   try {
@@ -42,11 +45,11 @@ export async function triggerOutboundCall(params: TriggerCallParams): Promise<Va
       },
     }
 
-    // Pass metadata that gets injected into the assistant context
-    if (params.metadata) {
-      body.assistantOverrides = {
-        variableValues: params.metadata,
-      }
+    // Pass metadata and tools that get injected into the assistant context
+    body.assistantOverrides = {
+      variableValues: params.metadata || {},
+      endCallFunctionEnabled: true,
+      endCallMessage: 'Thank you for your time. Have a great day!',
     }
 
     const res = await fetch('https://api.vapi.ai/call/phone', {
@@ -61,7 +64,16 @@ export async function triggerOutboundCall(params: TriggerCallParams): Promise<Va
     if (!res.ok) {
       const errorText = await res.text()
       console.error('[VapiClient] Call failed:', errorText)
-      return { success: false, error: `Vapi API error: ${res.status} ${errorText}` }
+      
+      let userFriendlyError = `Vapi API error: ${res.status} ${errorText}`
+      
+      if (errorText.includes('assistantId must be a UUID')) {
+        userFriendlyError = 'Invalid assistant ID format - please use a valid UUID from your Vapi dashboard'
+      } else if (errorText.includes('Could not get assistant') || errorText.includes('Not exist')) {
+        userFriendlyError = 'Assistant not found - please create the assistants in your Vapi dashboard first (see docs/VAPI_ASSISTANTS_SETUP.md)'
+      }
+      
+      return { success: false, error: userFriendlyError }
     }
 
     const data = await res.json()
@@ -90,7 +102,7 @@ export async function triggerCampaignCall(lead: {
 }, campaignContext?: {
   campaign_name?: string
   script_template?: string
-}): Promise<VapiCallResponse> {
+}, propertiesContext?: string): Promise<VapiCallResponse> {
   const assistantId = process.env.VAPI_ASSISTANT_OUTBOUND_ID
   if (!assistantId) {
     return { success: false, error: 'VAPI_ASSISTANT_OUTBOUND_ID not configured' }
@@ -109,6 +121,7 @@ export async function triggerCampaignCall(lead: {
       previous_notes: lead.notes || 'First contact',
       campaign_name: campaignContext?.campaign_name || 'Direct outreach',
       script_template: campaignContext?.script_template || 'General property inquiry',
+      premium_properties_context: propertiesContext || 'No specific premium properties listed.',
     },
   })
 }

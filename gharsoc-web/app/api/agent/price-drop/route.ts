@@ -16,10 +16,17 @@ export async function POST(request: NextRequest) {
       // return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { property_id, new_price_lakhs } = await request.json()
+    const { property_id, new_price, new_price_lakhs } = await request.json()
+    const parsedNewPrice = Number(new_price)
+    const parsedNewPriceLakhs = Number(new_price_lakhs)
+    const priceForMessage = Number.isFinite(parsedNewPriceLakhs) && parsedNewPriceLakhs > 0
+      ? parsedNewPriceLakhs
+      : Number.isFinite(parsedNewPrice) && parsedNewPrice > 0
+        ? Math.round(parsedNewPrice / 100000)
+        : null
 
-    if (!property_id || !new_price_lakhs) {
-      return NextResponse.json({ success: false, error: 'Missing property_id or new_price_lakhs' }, { status: 400 })
+    if (!property_id || !priceForMessage) {
+      return NextResponse.json({ success: false, error: 'Missing property_id or new_price' }, { status: 400 })
     }
 
     const leadsCollection = await getCollection('leads')
@@ -42,6 +49,13 @@ export async function POST(request: NextRequest) {
     }).limit(20).toArray() // Limit to 20 to avoid spamming too many at once
 
     if (targetLeads.length === 0) {
+      const agentLogsCollection = await getCollection('agent_logs')
+      await agentLogsCollection.insertOne({
+        agent_name: 'The Price Drop Negotiator',
+        action: `Scan complete. No leads with budget objections matched ${property.title}.`,
+        status: 'success',
+        created_at: new Date()
+      })
       return NextResponse.json({ success: true, message: 'No leads found matching price objections for this location', triggered: 0 })
     }
 
@@ -60,7 +74,7 @@ export async function POST(request: NextRequest) {
         },
         {
           campaign_name: 'Price Drop Negotiation',
-          script_template: `Great news! You previously mentioned that properties in ${property.location} were a bit outside your budget. The builder for ${property.title} just dropped the price to ${new_price_lakhs} Lakhs! Are you still interested in scheduling a visit?`,
+          script_template: `Great news! You previously mentioned that properties in ${property.location} were a bit outside your budget. The builder for ${property.title} just dropped the price to ${priceForMessage} Lakhs! Are you still interested in scheduling a visit?`,
         }
       )
 

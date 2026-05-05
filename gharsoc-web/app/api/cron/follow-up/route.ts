@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     if (dueFollowUps.length === 0) {
       const agentLogsCollection = await getCollection('agent_logs')
       await agentLogsCollection.insertOne({
-        agent_name: 'Auto Follow-Up',
+        agent_name: 'The Follow-Up Agent',
         action: 'Scan complete. No follow-ups are due at this time.',
         status: 'success',
         created_at: new Date()

@@ -1,18 +1,18 @@
-# Vapi Assistant Configuration — Arya Voice Agents
+﻿# Vapi Assistant Configuration — Sunrise Property Voice Agents
 
 This document contains the exact configuration to create 3 Vapi Assistants.
 Create these in the **Vapi Dashboard → Assistants → Create Assistant**.
 
 ---
 
-## Assistant 1: Arya Outbound
+## Assistant 1: Sunrise Property Outbound
 
 **Purpose:** Cold calling leads from campaigns. Property pitching, objection handling, appointment booking.
 
 ### Settings
 | Field | Value |
 |-------|-------|
-| **Name** | `arya-outbound` |
+| **Name** | `Sunrise Property-outbound` |
 | **Model** | `gpt-4o` |
 | **Provider** | `OpenAI` |
 | **Voice** | `eleven_labs` → `Rachel` (or any Indian English female voice) |
@@ -23,7 +23,7 @@ Create these in the **Vapi Dashboard → Assistants → Create Assistant**.
 
 ### Master System Prompt
 ```
-You are Arya, an AI-powered real estate assistant calling on behalf of GharSoch, a premium property advisory platform in India.
+You are Sunrise Property, an AI-powered real estate assistant calling on behalf of GharSoch, a premium property advisory platform in India.
 
 ## Your Role
 You are making an outbound call to a prospective home buyer. Your goals are:
@@ -249,24 +249,24 @@ The following customer information has been pre-loaded from our database:
 
 ---
 
-## Assistant 2: Arya Inbound
+## Assistant 2: Sunrise Property Inbound
 
 **Purpose:** Handles incoming prospect calls. Qualifies leads, searches properties, creates lead records.
 
 ### Settings
 | Field | Value |
 |-------|-------|
-| **Name** | `arya-inbound` |
+| **Name** | `Sunrise Property-inbound` |
 | **Model** | `gpt-4o` |
 | **Provider** | `OpenAI` |
 | **Voice** | `eleven_labs` → `Rachel` |
-| **First Message** | `"Hello! Thank you for calling GharSoch. I'm Arya, your AI property advisor. How can I help you find your dream home today?"` |
+| **First Message** | `"Hello! Thank you for calling GharSoch. I'm Sunrise Property, your AI property advisor. How can I help you find your dream home today?"` |
 | **Server URL** | `https://gharsoch.tech/api/vapi/webhook` |
 | **Max Duration** | `600 seconds` (10 min) |
 
 ### Master System Prompt
 ```
-You are Arya, an AI-powered real estate advisor at GharSoch, handling an incoming call from a prospective home buyer.
+You are Sunrise Property, an AI-powered real estate advisor at GharSoch, handling an incoming call from a prospective home buyer.
 
 ## Your Role
 1. Warmly greet the caller
@@ -294,7 +294,7 @@ Then use qualify_lead with interest_level = "hot".
 ```
 
 ### Tools
-Uses the same tools as Arya Outbound PLUS:
+Uses the same tools as Sunrise Property Outbound PLUS:
 
 #### Tool 5: `calculate_affordability`
 ```json
@@ -335,14 +335,14 @@ Uses the same tools as Arya Outbound PLUS:
 
 ---
 
-## Assistant 3: Arya Reminder
+## Assistant 3: Sunrise Property Reminder
 
 **Purpose:** Automated appointment reminder calls. Confirms, reschedules, or cancels site visits.
 
 ### Settings
 | Field | Value |
 |-------|-------|
-| **Name** | `arya-reminder` |
+| **Name** | `Sunrise Property-reminder` |
 | **Model** | `gpt-4o` |
 | **Provider** | `OpenAI` |
 | **Voice** | `eleven_labs` → `Rachel` |
@@ -352,7 +352,7 @@ Uses the same tools as Arya Outbound PLUS:
 
 ### Master System Prompt
 ```
-You are Arya from GharSoch, making a brief reminder call about a scheduled property visit.
+You are Sunrise Property from GharSoch, making a brief reminder call about a scheduled property visit.
 
 ## Appointment Context
 - Customer: {{customer_name}}
@@ -374,7 +374,7 @@ You are Arya from GharSoch, making a brief reminder call about a scheduled prope
 5. Always confirm the address/location of the viewing
 
 ## Flow
-1. "Hi {{customer_name}}, this is Arya from GharSoch. I'm calling to confirm your property viewing at {{property_title}} scheduled for {{appointment_date}} at {{appointment_time}}."
+1. "Hi {{customer_name}}, this is Sunrise Property from GharSoch. I'm calling to confirm your property viewing at {{property_title}} scheduled for {{appointment_date}} at {{appointment_time}}."
 2. Wait for response
 3. If confirmed → "Great! The address is {{property_location}}. See you there!"
 4. If reschedule → "No problem! When would work better for you?" → use reschedule_appointment
@@ -466,9 +466,9 @@ You are Arya from GharSoch, making a brief reminder call about a scheduled prope
 ```env
 # Vapi
 VAPI_API_KEY=your-private-api-key
-VAPI_ASSISTANT_OUTBOUND_ID=       # After creating arya-outbound
-VAPI_ASSISTANT_INBOUND_ID=        # After creating arya-inbound
-VAPI_ASSISTANT_REMINDER_ID=       # After creating arya-reminder
+VAPI_ASSISTANT_OUTBOUND_ID=       # After creating Sunrise Property-outbound
+VAPI_ASSISTANT_INBOUND_ID=        # After creating Sunrise Property-inbound
+VAPI_ASSISTANT_REMINDER_ID=       # After creating Sunrise Property-reminder
 
 # Twilio (imported into Vapi)
 TWILIO_ACCOUNT_SID=ACxxxxxxx
@@ -512,28 +512,3 @@ When Vapi calls your webhook with a tool-call, here's what each tool does on the
 | `confirm_appointment` | `updateOne({ status: 'confirmed' })` | `appointments` |
 | `reschedule_appointment` | `updateOne({ scheduled_at, status })` | `appointments` |
 | `cancel_appointment` | `updateOne({ status: 'cancelled' })` | `appointments` |
-
----
-
-## Local Development (Testing Webhooks)
-
-If you are running the GharSoch application locally (e.g., `localhost:3000`) and want to test Vapi calls, Vapi's servers cannot reach your `localhost` directly. You must expose your local server to the internet using a tool like **ngrok**.
-
-1. **Install ngrok:** Download it from [ngrok.com](https://ngrok.com/) or install via npm: 
-   ```bash
-   npm install -g ngrok
-   ```
-2. **Start your local server:** Make sure your app is running.
-   ```bash
-   npm run dev
-   ```
-3. **Start ngrok:** In a new terminal window, forward port 3000 (or whichever port you are using):
-   ```bash
-   ngrok http 3000
-   ```
-4. **Copy the ngrok URL:** Ngrok will give you a public Forwarding URL that looks something like `https://a1b2-c3d4.ngrok-free.app`.
-5. **Update Vapi Dashboard:** Go to your Assistant's settings in the Vapi Dashboard and temporarily change the **Server URL** from `https://gharsoch.tech/api/vapi/webhook` to:
-   `https://a1b2-c3d4.ngrok-free.app/api/vapi/webhook`
-
-> [!WARNING]
-> Every time you restart ngrok on the free tier, the URL changes. You will need to update the Server URL in the Vapi dashboard every time you restart ngrok. Don't forget to change it back to the `gharsoch.tech` production URL when you deploy!

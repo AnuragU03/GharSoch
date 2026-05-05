@@ -26,8 +26,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const uploadedFiles = [];
-    const assetIds = [];
+    const uploadedFiles: Array<{ file_name: string; url: string; success: boolean }> = [];
+    const assetIds: string[] = [];
 
     for (const file of files) {
       if (file instanceof File) {

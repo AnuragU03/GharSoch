@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status')
     const qualification = searchParams.get('qualification')
     const interest = searchParams.get('interest')
+    const place = searchParams.get('place')
     const search = searchParams.get('search')
     const limit = parseInt(searchParams.get('limit') || '100')
     const skip = parseInt(searchParams.get('skip') || '0')
@@ -20,6 +21,7 @@ export async function GET(request: NextRequest) {
     if (status) filter.status = status
     if (qualification) filter.qualification_status = qualification
     if (interest) filter.interest_level = interest
+    if (place) filter.place = place
     if (search) {
       filter.$or = [
         { name: { $regex: search, $options: 'i' } },
@@ -49,6 +51,7 @@ export async function POST(request: NextRequest) {
     const lead = {
       ...DEFAULT_LEAD,
       ...body,
+      next_follow_up_date: body.next_follow_up_date ? new Date(body.next_follow_up_date) : null,
       created_at: new Date(),
       updated_at: new Date(),
     }
@@ -69,6 +72,12 @@ export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
     const { _id, ...updates } = body
+
+    if (updates.next_follow_up_date) {
+      updates.next_follow_up_date = new Date(updates.next_follow_up_date)
+    } else if (updates.next_follow_up_date === '') {
+      updates.next_follow_up_date = null
+    }
 
     if (!_id) {
       return NextResponse.json({ success: false, error: '_id is required' }, { status: 400 })
@@ -95,14 +104,30 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
-
-    if (!id) {
-      return NextResponse.json({ success: false, error: 'id is required' }, { status: 400 })
-    }
+    const all = searchParams.get('all')
 
     const leads = await getCollection('leads')
-    const result = await leads.deleteOne({ _id: new ObjectId(id) })
 
+    // Delete all
+    if (all === 'true') {
+      const result = await leads.deleteMany({})
+      return NextResponse.json({ success: true, deletedCount: result.deletedCount })
+    }
+
+    // Bulk delete by ids (from request body)
+    if (!id) {
+      let body: any = {}
+      try { body = await request.json() } catch {}
+      const ids: string[] = body.ids || []
+      if (!ids.length) {
+        return NextResponse.json({ success: false, error: 'id or ids is required' }, { status: 400 })
+      }
+      const result = await leads.deleteMany({ _id: { $in: ids.map(i => new ObjectId(i)) } })
+      return NextResponse.json({ success: true, deletedCount: result.deletedCount })
+    }
+
+    // Single delete
+    const result = await leads.deleteOne({ _id: new ObjectId(id) })
     if (result.deletedCount === 0) {
       return NextResponse.json({ success: false, error: 'Lead not found' }, { status: 404 })
     }

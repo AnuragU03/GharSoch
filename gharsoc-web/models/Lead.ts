@@ -33,6 +33,7 @@ export interface Lead {
   customer_requirements: string
   timeline: string
   objections: string
+  followup_reason: string
   created_at: Date
   updated_at: Date
 }
@@ -64,6 +65,7 @@ export const DEFAULT_LEAD: Omit<Lead, '_id'> = {
   customer_requirements: '',
   timeline: '',
   objections: '',
+  followup_reason: '',
   created_at: new Date(),
   updated_at: new Date(),
 }

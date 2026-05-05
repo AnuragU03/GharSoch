@@ -86,12 +86,35 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const phone = searchParams.get('phone')
-
-    if (!phone) {
-      return NextResponse.json({ success: false, error: 'phone is required' }, { status: 400 })
-    }
+    const all = searchParams.get('all')
 
     const leads = await getCollection('leads')
+
+    // Remove all from DNC
+    if (all === 'true') {
+      await leads.updateMany(
+        { dnd_status: true },
+        { $set: { dnd_status: false, updated_at: new Date() } }
+      )
+      return NextResponse.json({ success: true, message: 'All numbers removed from DNC' })
+    }
+
+    // Bulk remove by phones (from request body)
+    if (!phone) {
+      let body: any = {}
+      try { body = await request.json() } catch {}
+      const phones: string[] = body.phones || []
+      if (!phones.length) {
+        return NextResponse.json({ success: false, error: 'phone or phones is required' }, { status: 400 })
+      }
+      await leads.updateMany(
+        { phone: { $in: phones } },
+        { $set: { dnd_status: false, updated_at: new Date() } }
+      )
+      return NextResponse.json({ success: true, message: `${phones.length} numbers removed from DNC` })
+    }
+
+    // Single remove
     await leads.updateMany(
       { phone },
       { $set: { dnd_status: false, updated_at: new Date() } }

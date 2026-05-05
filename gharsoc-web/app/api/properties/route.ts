@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCollection } from '@/lib/mongodb'
 import { ObjectId } from 'mongodb'
 import { DEFAULT_PROPERTY } from '@/models/Property'
+import SEED_PROPERTIES from '@/data/propertySeed'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type')
+    const builder = searchParams.get('builder')
+    const city = searchParams.get('city')
     const location = searchParams.get('location')
     const status = searchParams.get('status')
     const minPrice = searchParams.get('minPrice')
@@ -15,11 +18,41 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search')
     const limit = parseInt(searchParams.get('limit') || '100')
     const skip = parseInt(searchParams.get('skip') || '0')
+    const seed = searchParams.get('seed')
 
     const properties = await getCollection('properties')
+    
+    const insertProperties = async () => {
+      for (const prop of SEED_PROPERTIES) {
+        try {
+          await properties.insertOne(prop as any)
+        } catch (err) {
+          console.log('[API/Properties] Failed to insert property:', prop.title)
+        }
+      }
+    }
+    
+    // Re-seed if requested
+    if (seed === 'true') {
+      try {
+        await properties.deleteMany({})
+      } catch (err) {
+        console.log('[API/Properties] Delete many failed, proceeding anyway')
+      }
+      await insertProperties()
+    } else {
+      // Auto-seed if collection is empty
+      const count = await properties.countDocuments({})
+      if (count === 0) {
+        await insertProperties()
+      }
+    }
+
     const filter: Record<string, any> = {}
 
     if (type) filter.type = type
+    if (builder) filter.builder = builder
+    if (city) filter.city = city
     if (location) filter.location = { $regex: location, $options: 'i' }
     if (status) filter.status = status
     if (bedrooms) filter.bedrooms = parseInt(bedrooms)
@@ -110,14 +143,30 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
-
-    if (!id) {
-      return NextResponse.json({ success: false, error: 'id is required' }, { status: 400 })
-    }
+    const all = searchParams.get('all')
 
     const properties = await getCollection('properties')
-    const result = await properties.deleteOne({ _id: new ObjectId(id) })
 
+    // Delete all
+    if (all === 'true') {
+      const result = await properties.deleteMany({})
+      return NextResponse.json({ success: true, deletedCount: result.deletedCount })
+    }
+
+    // Bulk delete by ids (from request body)
+    if (!id) {
+      let body: any = {}
+      try { body = await request.json() } catch {}
+      const ids: string[] = body.ids || []
+      if (!ids.length) {
+        return NextResponse.json({ success: false, error: 'id or ids is required' }, { status: 400 })
+      }
+      const result = await properties.deleteMany({ _id: { $in: ids.map(i => new ObjectId(i)) } })
+      return NextResponse.json({ success: true, deletedCount: result.deletedCount })
+    }
+
+    // Single delete
+    const result = await properties.deleteOne({ _id: new ObjectId(id) })
     if (result.deletedCount === 0) {
       return NextResponse.json({ success: false, error: 'Property not found' }, { status: 404 })
     }

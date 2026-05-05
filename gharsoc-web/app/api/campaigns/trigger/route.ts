@@ -21,6 +21,17 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, error: 'Lead is on DNC list' }, { status: 403 })
       }
 
+      // Fetch premium properties for this lead's city to inject into Vapi memory
+      const properties = await getCollection('properties')
+      const matchingProperties = await properties.find({ 
+        city: { $regex: new RegExp(`^${lead.place || 'Ahmedabad'}$`, 'i') },
+        status: 'available' 
+      }).limit(5).toArray()
+
+      const propertiesContext = matchingProperties.map(p => 
+        `- ${p.title} by ${p.builder}: ${p.type} in ${p.location}, ₹${(p.price/100000).toFixed(2)} Lakhs, ${p.area_sqft} sqft. Amenities: ${p.amenities.slice(0, 3).join(', ')}.`
+      ).join('\n')
+
       const result = await triggerCampaignCall({
         phone: lead.phone,
         name: lead.name,
@@ -28,7 +39,7 @@ export async function POST(request: NextRequest) {
         location_pref: lead.location_pref,
         property_type: lead.property_type,
         notes: lead.notes,
-      })
+      }, undefined, propertiesContext)
 
       if (!result.success) {
         return NextResponse.json({ success: false, error: result.error }, { status: 502 })
@@ -39,6 +50,40 @@ export async function POST(request: NextRequest) {
         { _id: new ObjectId(leadId) },
         { $set: { last_contacted_at: new Date(), updated_at: new Date() }, $inc: { total_calls: 1 } }
       )
+
+      // Immediately save an initial call log so it appears in the UI right away
+      const calls = await getCollection('calls')
+      await calls.insertOne({
+        lead_id: lead._id.toString(),
+        lead_name: lead.name || '',
+        lead_phone: lead.phone,
+        agent_name: 'GharSoch AI',
+        agent_id: '',
+        campaign_id: '',
+        direction: 'outbound',
+        call_type: 'outbound',
+        duration: 0,
+        disposition: '',
+        call_outcome: '',
+        call_summary: '',
+        customer_availability: '',
+        preferred_callback_time: '',
+        preferred_callback_days: [],
+        customer_interest_level: '',
+        follow_up_required: false,
+        follow_up_date: null,
+        follow_up_notes: '',
+        key_requirements: '',
+        customer_objections: '',
+        next_steps: '',
+        recording_url: '',
+        transcript: '',
+        trai_compliant: true,
+        call_status: 'in-progress',
+        vapi_call_id: result.callId || '',
+        created_at: new Date(),
+        updated_at: new Date(),
+      })
 
       return NextResponse.json({
         success: true,
@@ -73,8 +118,19 @@ export async function POST(request: NextRequest) {
       )
 
       const results: { leadId: string; success: boolean; callId?: string; error?: string }[] = []
+      const propertiesColl = await getCollection('properties')
 
       for (const lead of targetLeads) {
+        // Fetch premium properties for this lead's city to inject into Vapi memory
+        const matchingProperties = await propertiesColl.find({ 
+          city: { $regex: new RegExp(`^${lead.place || 'Ahmedabad'}$`, 'i') },
+          status: 'available' 
+        }).limit(5).toArray()
+
+        const propertiesContext = matchingProperties.map(p => 
+          `- ${p.title} by ${p.builder}: ${p.type} in ${p.location}, ₹${(p.price/100000).toFixed(2)} Lakhs, ${p.area_sqft} sqft. Amenities: ${p.amenities.slice(0, 3).join(', ')}.`
+        ).join('\n')
+
         const result = await triggerCampaignCall(
           {
             phone: lead.phone,
@@ -87,7 +143,8 @@ export async function POST(request: NextRequest) {
           {
             campaign_name: campaign.name,
             script_template: campaign.script_template,
-          }
+          },
+          propertiesContext
         )
 
         results.push({

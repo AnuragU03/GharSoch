@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getCollection } from '@/lib/mongodb'
 
-export const dynamic = 'force-dynamic'
-
 export async function GET() {
   try {
     const [leads, calls, appointments, campaigns] = await Promise.all([

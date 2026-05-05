@@ -14,7 +14,13 @@ export async function GET() {
       next_follow_up_date: { $lte: tomorrow },
       dnd_status: { $ne: true },
       status: { $nin: ['closed', 'lost'] },
-    }).sort({ next_follow_up_date: 1 }).toArray()
+    }).toArray()
+
+    followUps.sort((a, b) => {
+      const aTime = a.next_follow_up_date ? new Date(a.next_follow_up_date).getTime() : Number.MAX_SAFE_INTEGER
+      const bTime = b.next_follow_up_date ? new Date(b.next_follow_up_date).getTime() : Number.MAX_SAFE_INTEGER
+      return aTime - bTime
+    })
 
     return NextResponse.json({ success: true, follow_ups: followUps, total: followUps.length })
   } catch (error) {

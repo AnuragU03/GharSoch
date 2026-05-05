@@ -21,22 +21,6 @@ export async function POST(request: NextRequest) {
 
         let resultData: any
 
-        // --- BUG FIX: Extract True Phone Number from Metadata ---
-        // If the AI tests via Web Widget, it passes 'unavailable'. 
-        // We must override it with the real number injected from the backend.
-        const callObj = payload.message?.call
-        const truePhone = callObj?.customer?.number || callObj?.assistantOverrides?.variableValues?.customer_phone
-        const trueName = callObj?.customer?.name || callObj?.assistantOverrides?.variableValues?.customer_name
-
-        if (truePhone && (!args.customer_phone || args.customer_phone === 'unavailable')) {
-          console.log(`[VAPI Webhook] Overriding AI phone '${args.customer_phone}' with true phone '${truePhone}'`)
-          args.customer_phone = truePhone
-        }
-        if (trueName && (!args.customer_name || args.customer_name === 'Unknown')) {
-          args.customer_name = trueName
-        }
-        // --------------------------------------------------------
-
         try {
           switch (fn.name) {
             case 'search_properties': {
@@ -44,6 +28,7 @@ export async function POST(request: NextRequest) {
               const filter: Record<string, any> = { status: 'available' }
 
               if (args.location) filter.location = { $regex: args.location, $options: 'i' }
+              if (args.city) filter.city = { $regex: args.city, $options: 'i' }
               if (args.property_type) filter.type = { $regex: args.property_type, $options: 'i' }
               if (args.bedrooms) filter.bedrooms = args.bedrooms
               if (args.budget_min || args.budget_max) {
@@ -59,11 +44,16 @@ export async function POST(request: NextRequest) {
                   title: p.title,
                   type: p.type,
                   location: p.location,
-                  price: `₹${(p.price / 100000).toFixed(0)} Lakhs`,
+                  city: p.city,
+                  price: p.price >= 10000000 ? `₹${(p.price / 10000000).toFixed(1)} Crores` : `₹${(p.price / 100000).toFixed(0)} Lakhs`,
+                  price_raw: p.price,
                   area: `${p.area_sqft} sqft`,
+                  area_sqft: p.area_sqft,
                   bedrooms: p.bedrooms,
                   builder: p.builder,
-                  description: p.description?.substring(0, 100),
+                  amenities: p.amenities || [],
+                  description: p.description,
+                  status: p.status,
                 })),
               }
               break
@@ -94,32 +84,31 @@ export async function POST(request: NextRequest) {
 
               const result = await leads.updateOne(
                 { phone: args.customer_phone },
-                { 
-                  $set: updateData,
-                  $setOnInsert: {
-                    name: args.customer_name || 'Unknown',
-                    email: '',
-                    source: 'inbound_call',
-                    status: 'contacted',
-                    dnd_status: false,
-                    place: args.location_pref || '',
-                    notes: '',
-                    preferred_contact_time: '',
-                    availability_window: '',
-                    availability_days: [],
-                    follow_up_count: 0,
-                    total_calls: 1,
-                    first_call_completed: true,
-                    last_contacted_at: new Date(),
-                    next_follow_up_date: null,
-                    assigned_agent_id: '',
-                    created_at: new Date(),
-                  }
-                },
-                { upsert: true }
+                { $set: updateData }
               )
 
-              if (result.upsertedId) {
+              if (result.matchedCount === 0 && args.customer_phone) {
+                await leads.insertOne({
+                  name: args.customer_name || 'Unknown',
+                  phone: args.customer_phone,
+                  email: '',
+                  source: 'inbound_call',
+                  status: 'contacted',
+                  dnd_status: false,
+                  place: args.location_pref || '',
+                  notes: '',
+                  preferred_contact_time: '',
+                  availability_window: '',
+                  availability_days: [],
+                  follow_up_count: 0,
+                  total_calls: 1,
+                  first_call_completed: true,
+                  last_contacted_at: new Date(),
+                  next_follow_up_date: null,
+                  assigned_agent_id: '',
+                  created_at: new Date(),
+                  ...updateData,
+                })
                 resultData = { status: 'created', message: 'New lead created and qualified' }
               } else {
                 resultData = { status: 'updated', message: 'Lead qualification updated' }
@@ -137,17 +126,7 @@ export async function POST(request: NextRequest) {
                 ? await properties.findOne({ title: { $regex: args.property_title, $options: 'i' } })
                 : null
 
-              if (args.property_title && !property) {
-                resultData = { error: 'Property not found in the database. Please verify the name or ask the user to clarify.' }
-                break
-              }
-
               const scheduledAt = new Date(args.preferred_date)
-              if (isNaN(scheduledAt.getTime())) {
-                resultData = { error: 'Invalid date format. Please ask the user to clarify the date (e.g., YYYY-MM-DD) and try again.' }
-                break
-              }
-
               if (args.preferred_time) {
                 const [hours, minutes] = args.preferred_time.split(':').map(Number)
                 if (!isNaN(hours)) scheduledAt.setHours(hours, minutes || 0)
@@ -180,12 +159,6 @@ export async function POST(request: NextRequest) {
             case 'schedule_callback': {
               const leads = await getCollection('leads')
               const scheduledAt = new Date(args.preferred_date)
-              
-              if (isNaN(scheduledAt.getTime())) {
-                resultData = { error: 'Invalid date format. Please ask the user to clarify the date (e.g., YYYY-MM-DD) and try again.' }
-                break
-              }
-
               if (args.preferred_time) {
                 const [hours, minutes] = args.preferred_time.split(':').map(Number)
                 if (!isNaN(hours)) scheduledAt.setHours(hours, minutes || 0)
@@ -292,16 +265,49 @@ export async function POST(request: NextRequest) {
     if (payload.message?.type === 'end-of-call-report') {
       console.log('[VAPI Webhook] Processing end-of-call-report...')
 
-      const transcript = payload.message.transcript || ''
-      const recordingUrl = payload.message.recordingUrl || ''
-      const duration = payload.message.duration || 0
-      const callId = payload.message.call?.id || ''
-      const customerPhone = payload.message.call?.customer?.number || payload.message.call?.assistantOverrides?.variableValues?.customer_phone || ''
+      // Handle both old and new VAPI payload formats
+      const msgData = payload.message
+      const callData = msgData.call || {}
+      const artifactData = msgData.artifact || {}
+
+      // Extract transcript — try multiple locations
+      const transcript = msgData.transcript
+        || artifactData.transcript
+        || (Array.isArray(artifactData.messages)
+          ? artifactData.messages
+              .filter((m: any) => m.role && m.message)
+              .map((m: any) => `${m.role === 'assistant' ? 'Agent' : 'Customer'}: ${m.message}`)
+              .join('\n')
+          : '')
+        || ''
+
+      const recordingUrl = msgData.recordingUrl || artifactData.recordingUrl || ''
+      const duration = msgData.duration || 0
+      const callId = callData.id || msgData.callId || ''
+      const customerPhone = callData.customer?.number || msgData.customer?.number || ''
+      const endedReason = msgData.endedReason || callData.endedReason || ''
+
+      // Use VAPI's built-in analysis if available
+      const vapiAnalysis = msgData.analysis || artifactData.analysis || {}
 
       // Use GPT-4 to extract structured data from the transcript
       let extractedData: any = {}
 
-      if (transcript && process.env.OPENAI_API_KEY) {
+      if (vapiAnalysis.summary) {
+        // Use VAPI analysis directly
+        const sd = vapiAnalysis.structuredData || {}
+        extractedData = {
+          call_summary: vapiAnalysis.summary,
+          disposition: sd.disposition || '',
+          call_outcome: sd.call_outcome || sd.callOutcome || '',
+          customer_interest_level: sd.customer_interest_level || sd.interestLevel || '',
+          key_requirements: sd.key_requirements || sd.requirements || '',
+          customer_objections: sd.customer_objections || sd.objections || '',
+          follow_up_required: sd.follow_up_required || false,
+          follow_up_notes: sd.follow_up_notes || '',
+          next_steps: sd.next_steps || sd.nextSteps || '',
+        }
+      } else if (transcript && transcript.length > 20 && process.env.OPENAI_API_KEY) {
         try {
           const extraction = await openai.chat.completions.create({
             model: 'gpt-4o',
@@ -329,20 +335,29 @@ export async function POST(request: NextRequest) {
         } catch (err) {
           console.error('[VAPI Webhook] GPT extraction error:', err)
         }
+      } else {
+        // No meaningful transcript — infer from endedReason
+        if (endedReason.includes('no-answer') || endedReason.includes('busy')) {
+          extractedData = { disposition: 'no_answer', call_summary: `Call not answered. Reason: ${endedReason}` }
+        } else if (endedReason.includes('voicemail')) {
+          extractedData = { disposition: 'voicemail', call_summary: 'Call went to voicemail.' }
+        }
       }
 
       // Find the lead by phone number
       const leads = await getCollection('leads')
       const lead = customerPhone ? await leads.findOne({ phone: customerPhone }) : null
 
-      // Save Call record
+      // Check if there's an existing call record (created at trigger time) to update
       const calls = await getCollection('calls')
-      await calls.insertOne({
+      const existingCall = callId ? await calls.findOne({ vapi_call_id: callId }) : null
+
+      const callRecord = {
         lead_id: lead?._id?.toString() || '',
         lead_name: lead?.name || '',
         lead_phone: customerPhone,
-        agent_name: 'Arya',
-        agent_id: payload.message.call?.assistantId || '',
+        agent_name: 'GharSoch AI',
+        agent_id: callData.assistantId || '',
         campaign_id: '',
         direction: 'outbound',
         call_type: 'outbound',
@@ -365,9 +380,24 @@ export async function POST(request: NextRequest) {
         trai_compliant: true,
         call_status: 'completed',
         vapi_call_id: callId,
-        created_at: new Date(),
         updated_at: new Date(),
-      })
+      }
+
+      if (existingCall) {
+        // Update the existing in-progress record
+        await calls.updateOne(
+          { _id: existingCall._id },
+          { $set: callRecord }
+        )
+        console.log(`[VAPI Webhook] Updated existing call record ${existingCall._id}`)
+      } else {
+        // Insert new record (webhook arrived before polling or no trigger record)
+        await calls.insertOne({
+          ...callRecord,
+          created_at: new Date(),
+        })
+        console.log('[VAPI Webhook] Created new call record')
+      }
 
       // Update lead with extracted insights
       if (lead && extractedData.customer_interest_level) {

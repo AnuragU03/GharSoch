@@ -1,4 +1,4 @@
-# GharSoch Voice Automation — Full Architecture
+﻿# GharSoch Voice Automation — Full Architecture
 
 ## The Big Picture
 
@@ -13,9 +13,9 @@ flowchart TD
     end
 
     subgraph VAPI["Vapi Cloud (Their Servers)"]
-        VA1["Arya Outbound\nAssistant"]
-        VA2["Arya Inbound\nAssistant"]
-        VA3["Arya Reminder\nAssistant"]
+        VA1["Sunrise Property Outbound\nAssistant"]
+        VA2["Sunrise Property Inbound\nAssistant"]
+        VA3["Sunrise Property Reminder\nAssistant"]
         VOICE["Voice Engine\nSTT + TTS"]
     end
 
@@ -76,7 +76,7 @@ sequenceDiagram
         D-->>W: 3 matching properties
         W-->>V: Property details
         
-        Note over V,L: Arya pitches properties to lead
+        Note over V,L: Sunrise Property pitches properties to lead
         
         V->>W: tool-call: book_appointment(date, property)
         W->>D: Create appointment record
@@ -101,10 +101,10 @@ sequenceDiagram
     participant D as MongoDB
 
     L->>T: Calls your Twilio number
-    T->>V: Routes to Arya Inbound assistant
+    T->>V: Routes to Sunrise Property Inbound assistant
     V->>L: "Hello! Welcome to GharSoch..."
     
-    Note over V,L: Arya asks qualification questions
+    Note over V,L: Sunrise Property asks qualification questions
     
     V->>W: tool-call: qualify_lead(name, budget, location, timeline)
     W->>D: Create new Lead record
@@ -116,7 +116,7 @@ sequenceDiagram
     D-->>W: 2 matching properties
     W-->>V: Property details
     
-    Note over V,L: Arya describes matching properties
+    Note over V,L: Sunrise Property describes matching properties
     
     V->>W: end-of-call-report
     W->>D: Save Call record
@@ -138,12 +138,12 @@ sequenceDiagram
     
     loop For each appointment
         A->>D: Fetch linked Lead + Property
-        A->>V: POST /call/phone + Arya Reminder assistantId
+        A->>V: POST /call/phone + Sunrise Property Reminder assistantId
         V->>T: Initiate call
         T->>L: ☎️ Phone rings
         L-->>V: Answers
         
-        Note over V,L: "Hi Rahul, this is Arya from GharSoch.\nJust confirming your 3 PM visit to\nPrestige Lakeside today."
+        Note over V,L: "Hi Rahul, this is Sunrise Property from GharSoch.\nJust confirming your 3 PM visit to\nPrestige Lakeside today."
         
         alt Lead confirms
             V->>A: tool-call: confirm_appointment

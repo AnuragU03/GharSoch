@@ -142,7 +142,10 @@ export default function VoiceCallPanel({ onCallStateChange }: VoiceCallPanelProp
     
     try {
       const assistantId = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID || 'mock-assistant-id'
-      await vapiRef.current.start(assistantId)
+      await vapiRef.current.start(assistantId, {
+        endCallFunctionEnabled: true,
+        endCallMessage: 'Thank you for your time. Have a great day!',
+      })
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to start call')
       setStatus('error')

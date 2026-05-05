@@ -1,4 +1,4 @@
-import { getCollection } from '@/lib/mongodb'
+﻿import { getCollection } from '@/lib/mongodb'
 import { ObjectId } from 'mongodb'
 
 export default async function getPropertyCollection() {
@@ -9,6 +9,7 @@ export interface Property {
   _id?: ObjectId
   title: string
   type: string
+  city: string
   location: string
   price: number
   area_sqft: number
@@ -25,6 +26,7 @@ export interface Property {
 export const DEFAULT_PROPERTY: Omit<Property, '_id'> = {
   title: '',
   type: '',
+  city: '',
   location: '',
   price: 0,
   area_sqft: 0,

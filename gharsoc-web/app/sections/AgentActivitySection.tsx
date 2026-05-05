@@ -20,7 +20,7 @@ const CRON_AGENTS = [
   {
     id: 'matchmaker',
     name: 'The Matchmaker',
-    role: 'Scans new clients against all properties using GPT-4o. Promotes clients with ≥75% match score directly to the Lead Pipeline.',
+    role: 'Scans new clients against all properties using GPT-4o. Promotes clients with 75%+ match score directly to the Lead Pipeline.',
     endpoint: '/api/agent/matchmaker',
     method: 'POST',
     icon: HiOutlineSparkles,
@@ -30,7 +30,7 @@ const CRON_AGENTS = [
   },
   {
     id: 'reminders',
-    name: 'Appointment Guardian',
+    name: 'The Appointment Guardian',
     role: 'Checks appointments scheduled for the next 24 hours and automatically triggers AI reminder calls via Vapi.',
     endpoint: '/api/cron/reminders',
     method: 'GET',
@@ -41,7 +41,7 @@ const CRON_AGENTS = [
   },
   {
     id: 're-engage',
-    name: 'Dead Lead Re-engager',
+    name: 'The Dead Lead Re-engager',
     role: 'Finds leads that have been cold for 60+ days and launches targeted re-engagement outreach campaigns.',
     endpoint: '/api/cron/re-engage',
     method: 'GET',
@@ -52,7 +52,7 @@ const CRON_AGENTS = [
   },
   {
     id: 'follow-up',
-    name: 'Auto Follow-Up',
+    name: 'The Follow-Up Agent',
     role: 'Manages the communication cadence for pending follow-ups, ensuring no lead falls through the cracks.',
     endpoint: '/api/cron/follow-up',
     method: 'GET',
@@ -63,7 +63,7 @@ const CRON_AGENTS = [
   },
   {
     id: 'price-drop',
-    name: 'Price Drop Negotiator',
+    name: 'The Price Drop Negotiator',
     role: 'When a property price drops, proactively notifies all leads with budget objections and initiates AI negotiation calls.',
     endpoint: '/api/agent/price-drop',
     method: 'POST',
@@ -112,19 +112,25 @@ export default function AgentActivitySection() {
     setRunningAgentId(agent.id)
     setRunResult(null)
     try {
-      const cronSecret = ''
-      const res = await fetch(agent.endpoint, {
-        method: agent.method,
+      const res = await fetch('/api/agent/run', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agent_id: agent.id }),
       })
-      const data = await res.json()
-      setRunResult({ success: data.success, message: data.message || JSON.stringify(data) })
-      // Refresh logs after run
-      setTimeout(fetchLogs, 1500)
-    } catch {
+      const data = await res.json().catch(() => ({}))
+      const success = res.ok && data.success !== false
+      const message = data.message || data.error || `Request finished with HTTP ${res.status}`
+      setRunResult({ success, message })
+
+      if (success) {
+        setTimeout(fetchLogs, 1500)
+      }
+    } catch (error) {
+      console.error('Failed to run agent:', error)
       setRunResult({ success: false, message: 'Network error. Is the server running?' })
+    } finally {
+      setRunningAgentId(null)
     }
-    setRunningAgentId(null)
   }
 
   return (

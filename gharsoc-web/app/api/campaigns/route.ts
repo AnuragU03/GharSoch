@@ -93,14 +93,30 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
-
-    if (!id) {
-      return NextResponse.json({ success: false, error: 'id is required' }, { status: 400 })
-    }
+    const all = searchParams.get('all')
 
     const campaigns = await getCollection('campaigns')
-    const result = await campaigns.deleteOne({ _id: new ObjectId(id) })
 
+    // Delete all
+    if (all === 'true') {
+      const result = await campaigns.deleteMany({})
+      return NextResponse.json({ success: true, deletedCount: result.deletedCount })
+    }
+
+    // Bulk delete by ids (from request body)
+    if (!id) {
+      let body: any = {}
+      try { body = await request.json() } catch {}
+      const ids: string[] = body.ids || []
+      if (!ids.length) {
+        return NextResponse.json({ success: false, error: 'id or ids is required' }, { status: 400 })
+      }
+      const result = await campaigns.deleteMany({ _id: { $in: ids.map(i => new ObjectId(i)) } })
+      return NextResponse.json({ success: true, deletedCount: result.deletedCount })
+    }
+
+    // Single delete
+    const result = await campaigns.deleteOne({ _id: new ObjectId(id) })
     if (result.deletedCount === 0) {
       return NextResponse.json({ success: false, error: 'Campaign not found' }, { status: 404 })
     }

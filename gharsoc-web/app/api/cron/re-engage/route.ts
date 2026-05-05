@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     if (deadLeads.length === 0) {
       const agentLogsCollection = await getCollection('agent_logs')
       await agentLogsCollection.insertOne({
-        agent_name: 'Dead Lead Re-engager',
+        agent_name: 'The Dead Lead Re-engager',
         action: 'Scan complete. No dead leads (60+ days) found eligible for re-engagement.',
         status: 'success',
         created_at: new Date()
