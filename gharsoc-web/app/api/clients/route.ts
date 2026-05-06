@@ -57,7 +57,8 @@ export async function POST(request: NextRequest) {
 
     // Trigger AI Matchmaker in background (non-blocking)
     const cronSecret = process.env.CRON_SECRET
-    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3333'
+    // Use http://localhost:3000 for internal API calls to avoid SSL certificate validation errors
+    const baseUrl = 'http://localhost:3000'
     fetch(`${baseUrl}/api/agent/matchmaker`, {
       method: 'POST',
       headers: {

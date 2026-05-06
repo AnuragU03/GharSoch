@@ -45,7 +45,9 @@ export async function POST(request: NextRequest) {
     }
 
     const cronSecret = process.env.CRON_SECRET
-    const targetUrl = new URL(runner.endpoint, request.url)
+    // Use http://localhost:3000 for internal API calls to avoid SSL certificate validation errors
+    // (Azure reverse proxy causes issues with external domain HTTPS for internal requests)
+    const targetUrl = new URL(runner.endpoint, 'http://localhost:3000')
     const headers: HeadersInit = { 'Content-Type': 'application/json' }
 
     if (cronSecret) {
