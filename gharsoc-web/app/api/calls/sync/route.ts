@@ -214,6 +214,7 @@ export async function POST(request: NextRequest) {
       await calls.updateOne({ _id: call._id }, { $set: updateData })
 
       // Also update the lead with insights from the call
+      let updatedLead: any = null
       if (call.lead_phone && extractedData.customer_interest_level) {
         const leadUpdate: Record<string, any> = {
           interest_level: extractedData.customer_interest_level,
@@ -236,7 +237,52 @@ export async function POST(request: NextRequest) {
           leadUpdate.objections = extractedData.customer_objections
         }
 
-        await leads.updateOne({ phone: call.lead_phone }, { $set: leadUpdate })
+        const result = await leads.updateOne({ phone: call.lead_phone }, { $set: leadUpdate })
+        updatedLead = await leads.findOne({ phone: call.lead_phone })
+      }
+
+      // Call State Validator to check for inconsistencies
+      try {
+        if (updatedLead) {
+          const validationResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/agent/call-state-validator`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              call_data: {
+                _id: call._id.toString(),
+                vapi_call_id: call.vapi_call_id,
+                lead_id: call.lead_id,
+                disposition: extractedData.disposition,
+                call_outcome: extractedData.call_outcome,
+                customer_interest_level: extractedData.customer_interest_level,
+                follow_up_required: extractedData.follow_up_required,
+              },
+              lead_state: {
+                status: updatedLead.status,
+                qualification_status: updatedLead.qualification_status,
+                interest_level: updatedLead.interest_level,
+                follow_up_required: updatedLead.follow_up_required,
+              },
+            }),
+          })
+
+          if (validationResponse.ok) {
+            const validationData = await validationResponse.json()
+            // Store validator run_id in call record for auditing
+            await calls.updateOne(
+              { _id: call._id },
+              {
+                $set: {
+                  validator_status: validationData.data?.validation_status || 'valid',
+                  validator_run_id: validationData.data?.run_id,
+                },
+              }
+            )
+          }
+        }
+      } catch (validationError) {
+        console.error('[CallSync] State validation error (non-blocking):', validationError)
+        // Continue sync even if validation fails — it's a secondary check
       }
 
       syncedCount++

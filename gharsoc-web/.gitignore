@@ -40,3 +40,8 @@ next-env.d.ts
 
 # Scripts
 *.ps1
+
+# Phase documentation and test files (local development only)
+PHASE_7_IMPLEMENTATION.md
+PHASE_7_QUICK_START.md
+PHASE_7_TESTING.ts

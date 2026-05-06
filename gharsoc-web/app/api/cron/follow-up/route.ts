@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCollection } from '@/lib/mongodb'
 import { triggerCampaignCall } from '@/lib/vapiClient'
+import { agentLogger } from '@/lib/agentLogger'
 
 export const dynamic = 'force-dynamic'
 
 // Secure cron job execution
 // In production, this should be protected by an API key or cron secret.
 export async function GET(request: NextRequest) {
+  let runId: string | null = null
+
   try {
     const authHeader = request.headers.get('authorization')
     const cronSecret = process.env.CRON_SECRET
@@ -18,7 +21,25 @@ export async function GET(request: NextRequest) {
     const leadsCollection = await getCollection('leads')
     const callsCollection = await getCollection('calls')
     
+    // Start execution logging
+    runId = await agentLogger.startAgentRun(
+      '69e8f709f89cad5d4b752d24', // Follow-Up Agent ID
+      'The Follow-Up Agent',
+      {
+        cron_job: 'follow-up',
+        trigger_time: new Date().toISOString(),
+      },
+      { cron_type: 'scheduled', frequency: 'hourly' }
+    )
+
     const now = new Date()
+
+    await agentLogger.logAgentThinking(
+      runId,
+      'evaluation',
+      `Scanning for due follow-ups. Current time: ${now.toISOString()}`,
+      1.0
+    )
 
     // Find all leads that:
     // 1. Have a status of 'follow_up'
@@ -30,6 +51,14 @@ export async function GET(request: NextRequest) {
       next_follow_up_date: { $lte: now }
     }).toArray()
 
+    await agentLogger.logAgentThinking(
+      runId,
+      'evaluation',
+      `Found ${dueFollowUps.length} leads due for follow-up`,
+      1.0,
+      { leads_count: dueFollowUps.length }
+    )
+
     if (dueFollowUps.length === 0) {
       const agentLogsCollection = await getCollection('agent_logs')
       await agentLogsCollection.insertOne({
@@ -38,12 +67,39 @@ export async function GET(request: NextRequest) {
         status: 'success',
         created_at: new Date()
       })
+
+      await agentLogger.completeAgentRun(
+        runId,
+        { triggered_calls: 0, total_scanned: 0, message: 'No due follow-ups' },
+        'completed'
+      )
+
       return NextResponse.json({ success: true, message: 'No due follow-ups found', triggered: 0 })
     }
 
     let triggeredCount = 0
+    const lead_details: any[] = []
 
     for (const lead of dueFollowUps) {
+      // Evaluate each lead
+      const leadEvaluation = {
+        lead_id: lead._id.toString(),
+        lead_name: lead.name,
+        status: lead.status,
+        interest_level: lead.interest_level,
+        budget_range: lead.budget_range,
+        location_pref: lead.location_pref,
+        follow_up_count: lead.follow_up_count || 0,
+      }
+
+      await agentLogger.logAgentThinking(
+        runId,
+        'evaluation',
+        `Evaluating lead: ${lead.name} (ID: ${lead._id.toString()})`,
+        0.95,
+        leadEvaluation
+      )
+
       // Trigger the call via Vapi Outbound Assistant
       const result = await triggerCampaignCall(
         {
@@ -61,6 +117,15 @@ export async function GET(request: NextRequest) {
       )
 
       if (result.success) {
+        // Log the action
+        await agentLogger.logAgentAction(
+          runId,
+          'outbound_call_trigger',
+          `Triggered follow-up call for ${lead.name}`,
+          { lead_id: lead._id.toString(), phone: lead.phone },
+          { vapi_call_id: result.callId, call_triggered: true }
+        )
+
         // Log the call creation
         await callsCollection.insertOne({
           lead_id: lead._id.toString(),
@@ -88,32 +153,91 @@ export async function GET(request: NextRequest) {
           }
         )
 
+        lead_details.push({
+          lead_id: lead._id.toString(),
+          lead_name: lead.name,
+          status: 'triggered',
+          recommendation: 'Call queued for immediate execution',
+        })
+
         triggeredCount++
+      } else {
+        await agentLogger.logAgentAction(
+          runId,
+          'outbound_call_trigger',
+          `Failed to trigger follow-up call for ${lead.name}`,
+          { lead_id: lead._id.toString(), phone: lead.phone },
+          {},
+          'VAPI call trigger failed'
+        )
+
+        lead_details.push({
+          lead_id: lead._id.toString(),
+          lead_name: lead.name,
+          status: 'failed',
+          reason: 'VAPI call trigger failed',
+        })
       }
       
       // Delay slightly between calls to avoid hitting Vapi rate limits
       await new Promise(resolve => setTimeout(resolve, 1000))
     }
 
+    await agentLogger.logAgentThinking(
+      runId,
+      'result_analysis',
+      `Successfully triggered ${triggeredCount} out of ${dueFollowUps.length} follow-up calls`,
+      0.95,
+      { triggered: triggeredCount, total: dueFollowUps.length }
+    )
+
     const agentLogsCollection = await getCollection('agent_logs')
     await agentLogsCollection.insertOne({
       agent_name: 'The Follow-Up Agent',
       action: `Scanned ${dueFollowUps.length} due follow-ups. Triggered ${triggeredCount} calls.`,
       status: 'success',
-      created_at: new Date()
+      created_at: new Date(),
+      details: lead_details,
     })
+
+    await agentLogger.completeAgentRun(
+      runId,
+      {
+        triggered_calls: triggeredCount,
+        total_scanned: dueFollowUps.length,
+        lead_details,
+        message: `Triggered ${triggeredCount} follow-up calls`,
+      },
+      'completed'
+    )
 
     return NextResponse.json({
       success: true,
       message: `Triggered ${triggeredCount} follow-up calls`,
       triggered: triggeredCount,
-      total_due: dueFollowUps.length
+      total_due: dueFollowUps.length,
+      run_id: runId,
     })
 
   } catch (error) {
     console.error('[API/Cron/FollowUp] GET Error:', error)
+
+    if (runId) {
+      await agentLogger.logError(
+        runId,
+        error instanceof Error ? error.message : 'Unknown error',
+        error instanceof Error ? error.name : 'UnknownError',
+        error instanceof Error ? error.stack : undefined
+      )
+      await agentLogger.completeAgentRun(
+        runId,
+        { error: error instanceof Error ? error.message : 'Unknown error' },
+        'error'
+      )
+    }
+
     return NextResponse.json(
-      { success: false, error: 'Failed to execute follow-up cron job' },
+      { success: false, error: 'Failed to execute follow-up cron job', run_id: runId },
       { status: 500 }
     )
   }
