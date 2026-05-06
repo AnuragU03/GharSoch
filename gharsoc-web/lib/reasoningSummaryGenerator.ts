@@ -32,6 +32,11 @@ class ReasoningSummaryGenerator {
    */
   async generateSummary(request: ReasoningSummaryRequest): Promise<ReasoningSummary> {
     try {
+      // Validate OpenAI key is set
+      if (!process.env.OPENAI_API_KEY) {
+        return this.getFallbackSummary(request)
+      }
+
       const prompt = this.buildSummaryPrompt(request)
 
       const completion = await openai.chat.completions.create({
@@ -54,7 +59,7 @@ Format your response as valid JSON with keys: summary, key_insights (array), imp
 
       const responseContent = completion.choices[0].message.content
       if (!responseContent) {
-        throw new Error('No response from OpenAI')
+        return this.getFallbackSummary(request)
       }
 
       const parsed = JSON.parse(responseContent)
@@ -66,12 +71,19 @@ Format your response as valid JSON with keys: summary, key_insights (array), imp
       }
     } catch (error) {
       console.error('[ReasoningSummaryGenerator] Error:', error)
-      return {
-        summary: `${request.agent_name} performed action: ${request.action_type}`,
-        key_insights: [request.action_description],
-        confidence: 0.5,
-        implications: 'Unable to generate detailed analysis',
-      }
+      return this.getFallbackSummary(request)
+    }
+  }
+
+  /**
+   * Fallback summary when OpenAI call fails
+   */
+  private getFallbackSummary(request: ReasoningSummaryRequest): ReasoningSummary {
+    return {
+      summary: `${request.agent_name} completed action: ${request.action_type}`,
+      key_insights: request.reasoning_steps.map((step) => step.content).slice(0, 3),
+      confidence: 0.5,
+      implications: 'Summary generation unavailable. Review reasoning steps above.',
     }
   }
 

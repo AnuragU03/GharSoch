@@ -161,27 +161,29 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate human-readable summary of reasoning (Phase: Further Considerations)
-    const reasoning_steps = await agentLogger.getExecutionTrace(runId).then(
-      (trace) => trace?.reasoning_steps || []
-    )
-
+    // Non-blocking: generate in background, don't fail response if it errors
     let reasoning_summary = null
-    try {
-      reasoning_summary = await reasoningSummaryGenerator.generateSummary({
-        agent_name: agentConfig.name,
-        action_type: 'decision_made',
-        reasoning_steps: reasoning_steps.map((step: any) => ({
-          step_type: step.step_type,
-          content: step.content,
-          confidence: step.confidence,
-        })),
-        action_description: `Agent processed message and returned structured result`,
-        action_result: parsedResult,
-        context: context,
-      })
-    } catch (summaryError) {
-      console.error('Failed to generate reasoning summary:', summaryError)
-      // Continue without summary if generation fails
+    if (process.env.OPENAI_API_KEY) {
+      try {
+        const executionTrace = await agentLogger.getExecutionTrace(runId)
+        if (executionTrace?.reasoning_steps?.length > 0) {
+          reasoning_summary = await reasoningSummaryGenerator.generateSummary({
+            agent_name: agentConfig.name,
+            action_type: 'decision_made',
+            reasoning_steps: executionTrace.reasoning_steps.map((step: any) => ({
+              step_type: step.step_type,
+              content: step.content,
+              confidence: step.confidence,
+            })),
+            action_description: `Agent processed message and returned structured result`,
+            action_result: parsedResult,
+            context: context,
+          })
+        }
+      } catch (summaryError) {
+        console.error('[Agent] Summary generation failed (non-blocking):', summaryError)
+        // Continue without summary - response still valid
+      }
     }
 
     // Normalize response to match the expected format of the frontend

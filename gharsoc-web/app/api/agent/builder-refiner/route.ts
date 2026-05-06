@@ -253,26 +253,32 @@ Return a JSON object with:
     }
 
     // Generate reasoning summary
+    // Non-blocking: generate in background, don't fail response if it errors
     let reasoningSummary = null
-    try {
-      const executionTrace = await agentLogger.getExecutionTrace(runId)
-      reasoningSummary = await reasoningSummaryGenerator.generateSummary({
-        agent_name: agentConfig.name,
-        action_type: 'property_refinement',
-        reasoning_steps: (executionTrace?.reasoning_steps || []).map((step: any) => ({
-          step_type: step.step_type,
-          content: step.content,
-          confidence: step.confidence,
-        })),
-        action_description: `Re-ranked ${propertiesToRefine.length} properties based on builder KB alignment with client profile`,
-        action_result: refinedResult,
-        context: {
-          builders_analyzed: Object.keys(builderDataMap).length,
-          client_budget: [client_profile?.budget_min, client_profile?.budget_max],
-        },
-      })
-    } catch (summaryError) {
-      console.error('[BuilderRefiner] Failed to generate summary:', summaryError)
+    if (process.env.OPENAI_API_KEY) {
+      try {
+        const executionTrace = await agentLogger.getExecutionTrace(runId)
+        if (executionTrace?.reasoning_steps?.length > 0) {
+          reasoningSummary = await reasoningSummaryGenerator.generateSummary({
+            agent_name: agentConfig.name,
+            action_type: 'property_refinement',
+            reasoning_steps: (executionTrace?.reasoning_steps || []).map((step: any) => ({
+              step_type: step.step_type,
+              content: step.content,
+              confidence: step.confidence,
+            })),
+            action_description: `Re-ranked ${propertiesToRefine.length} properties based on builder KB alignment with client profile`,
+            action_result: refinedResult,
+            context: {
+              builders_analyzed: Object.keys(builderDataMap).length,
+              client_budget: [client_profile?.budget_min, client_profile?.budget_max],
+            },
+          })
+        }
+      } catch (summaryError) {
+        console.error('[BuilderRefiner] Summary generation failed (non-blocking):', summaryError)
+        // Continue without summary - response still valid
+      }
     }
 
     const response = {
