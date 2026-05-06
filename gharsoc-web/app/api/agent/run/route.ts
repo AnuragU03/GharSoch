@@ -56,6 +56,9 @@ export async function POST(request: NextRequest) {
       method: runner.method,
       headers,
       cache: 'no-store',
+    }).catch((fetchError) => {
+      console.error(`[API/Agent/Run] Fetch failed for ${runner.endpoint}:`, fetchError)
+      throw new Error(`Failed to reach ${runner.endpoint}: ${fetchError.message}`)
     })
     const data = await readJson(response)
     const message = data.message || data.error || response.statusText || 'Agent run completed.'

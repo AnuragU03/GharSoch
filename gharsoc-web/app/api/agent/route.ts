@@ -3,7 +3,6 @@ import OpenAI from 'openai'
 import { getAgentConfig } from '@/lib/agentRegistry'
 import { agentLogger } from '@/lib/agentLogger'
 import { executionEventBroadcaster } from '@/lib/agentExecutionEventBroadcaster'
-import { reasoningSummaryGenerator } from '@/lib/reasoningSummaryGenerator'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || '',
@@ -161,9 +160,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate human-readable summary of reasoning (Phase: Further Considerations)
-    // Non-blocking: generate in background, don't fail response if it errors
+    // Temporarily disabled: Causing SSL errors in production
+    // Will re-enable after fixing OpenAI client configuration
     let reasoning_summary = null
-    if (process.env.OPENAI_API_KEY) {
+    const ENABLE_REASONING_SUMMARY = false
+    
+    if (ENABLE_REASONING_SUMMARY && process.env.OPENAI_API_KEY) {
       try {
         const executionTrace = await agentLogger.getExecutionTrace(runId)
         if (executionTrace?.reasoning_steps?.length > 0) {
