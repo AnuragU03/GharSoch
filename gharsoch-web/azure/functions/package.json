@@ -1,0 +1,21 @@
+{
+  "name": "gharsoch-azure-functions",
+  "version": "1.0.0",
+  "description": "Azure Timer Functions — cron wiring for GharSoch agent routes",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "prestart": "npm run build",
+    "start": "func start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@azure/functions": "^3.5.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

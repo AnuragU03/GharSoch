@@ -9,7 +9,7 @@ on:
 env:
   AZURE_WEBAPP_NAME: gharsoc-app-primary
   NODE_VERSION: '20.x'
-  PROJECT_PATH: 'gharsoc-web'
+  PROJECT_PATH: 'gharsoch-web'
 
 jobs:
   build:

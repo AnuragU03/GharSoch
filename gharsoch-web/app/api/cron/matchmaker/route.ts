@@ -1,0 +1,291 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { runAgent } from '@/lib/runAgent'
+import { ObjectId } from 'mongodb'
+
+export const dynamic = 'force-dynamic'
+
+/**
+ * POST /api/cron/matchmaker
+ * The Matchmaker — cron sweep every 30 min (Phase 3.5 will promote to event).
+ * Pulls unmatched leads + available properties → GPT-4o pairing prompt →
+ * score ≥ 75 → update lead + trigger Vapi outbound call.
+ */
+export async function POST(request: NextRequest) {
+  // ── Auth ────────────────────────────────────────────────────────────────
+  const cronSecret = process.env.CRON_SECRET
+  if (cronSecret && request.headers.get('x-cron-secret') !== cronSecret) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    const { runId, output } = await runAgent({
+      agentId: 'matchmaker',
+      agentName: 'The Matchmaker',
+      trigger: 'cron',
+      input: {
+        cron_job: 'matchmaker',
+        trigger_time: new Date().toISOString(),
+      },
+      metadata: { cron_type: 'scheduled', frequency: 'every_30_min' },
+
+      handler: async (ctx) => {
+        // ── Step 1: evaluation ─────────────────────────────────────────────
+        await ctx.think('evaluation',
+          'Scanning for unmatched leads (status=new, dnd=false) and available properties to feed into the GPT-4o pairing engine.',
+          { confidence: 1.0 }
+        )
+
+        const unmatchedLeads = await ctx.db.findMany('leads', {
+          status: 'new',
+          dnd_status: { $ne: true },
+        })
+
+        const availableProperties = await ctx.db.findMany('properties', {
+          status: 'available',
+        })
+
+        await ctx.think('decision',
+          unmatchedLeads.length === 0
+            ? 'No unmatched leads in the pipeline. Exiting cleanly.'
+            : availableProperties.length === 0
+              ? `Found ${unmatchedLeads.length} lead(s) but 0 available properties — no matching possible.`
+              : `Found ${unmatchedLeads.length} unmatched lead(s) and ${availableProperties.length} available propert(ies). Submitting to GPT-4o pairing engine with score threshold 75.`,
+          {
+            confidence: 1.0,
+            metadata: {
+              leads_count: unmatchedLeads.length,
+              properties_count: availableProperties.length,
+            },
+          }
+        )
+
+        if (unmatchedLeads.length === 0 || availableProperties.length === 0) {
+          return {
+            matches_found: 0,
+            calls_triggered: 0,
+            total_leads_scanned: unmatchedLeads.length,
+            summary: unmatchedLeads.length === 0
+              ? 'No unmatched leads in the pipeline.'
+              : 'No available properties to match against.',
+          }
+        }
+
+        // Prepare slim payloads for GPT-4o (avoid sending raw Mongo docs)
+        const clientPayload = (unmatchedLeads as any[]).map((c) => ({
+          id: String(c._id),
+          name: c.name,
+          budget: c.budget_range,
+          location: c.location_pref,
+          type: c.property_type,
+          timeline: c.timeline,
+          notes: (c.notes || '').slice(0, 200),
+        }))
+
+        const propertyPayload = (availableProperties as any[]).map((p) => ({
+          id: String(p._id),
+          title: p.title,
+          price: p.price,
+          location: p.location,
+          type: p.type,
+          bedrooms: p.bedrooms,
+        }))
+
+        // ── GPT-4o pairing call via ctx.openai ─────────────────────────────
+        const gptResult = await ctx.openai.chat({
+          model: 'gpt-4o',
+          messages: [
+            {
+              role: 'system',
+              content: `You are an expert real-estate matchmaker AI. Analyse the clients and properties below.
+Return a JSON object with a single array "matches". Each element must have:
+  - client_id  (string)
+  - property_id (string)
+  - score       (integer 1–100)
+  - rationale   (string, ≤ 60 words)
+Only include pairs with score ≥ 75. If none qualify, return {"matches":[]}.`,
+            },
+            {
+              role: 'user',
+              content: JSON.stringify({ clients: clientPayload, properties: propertyPayload }),
+            },
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.2,
+          max_tokens: 1200,
+        })
+
+        let matches: Array<{ client_id: string; property_id: string; score: number; rationale: string }> = []
+        try {
+          const parsed = JSON.parse(gptResult.content)
+          matches = (parsed.matches || []).filter((m: any) => Number(m.score) >= 75)
+        } catch {
+          matches = []
+        }
+
+        await ctx.act('gpt4o_pairing_complete', `GPT-4o returned ${matches.length} qualifying match(es)`, {
+          parameters: { leads_sent: clientPayload.length, properties_sent: propertyPayload.length },
+          result: { matches_above_75: matches.length },
+        })
+
+        if (matches.length === 0) {
+          await ctx.think('result_analysis',
+            'GPT-4o found no client–property pairs with score ≥ 75 in this sweep. No Vapi calls triggered.',
+            { confidence: 0.95 }
+          )
+          return {
+            matches_found: 0,
+            calls_triggered: 0,
+            total_leads_scanned: unmatchedLeads.length,
+            summary: 'Matchmaker ran — no qualifying pairs (score < 75) found this sweep.',
+          }
+        }
+
+        // ── Process matches ────────────────────────────────────────────────
+        let callsTriggered = 0
+        const match_details: Array<Record<string, any>> = []
+
+        for (const match of matches) {
+          const clientObjId = (() => {
+            try { return new ObjectId(match.client_id) } catch { return null }
+          })()
+          if (!clientObjId) continue
+
+          const matchedProperty = (availableProperties as any[]).find(
+            (p) => String(p._id) === match.property_id
+          )
+
+          // Update lead record with match info
+          await ctx.db.updateOne('leads', { _id: clientObjId }, {
+            $set: {
+              qualification_status: 'matched',
+              interest_level: 'warm',
+              matched_property_id: match.property_id,
+              match_score: match.score,
+              match_rationale: match.rationale,
+              notes: `[Matchmaker] Matched with ${matchedProperty?.title || match.property_id}. Score: ${match.score}. ${match.rationale}`,
+              updated_at: new Date(),
+            },
+          })
+
+          // Mirror into clients collection (if entry exists there)
+          await ctx.db.updateOne('clients', { _id: clientObjId }, {
+            $set: {
+              status: 'matched',
+              ai_match_status: 'matched',
+              matched_property_id: match.property_id,
+              matched_property_title: matchedProperty?.title || match.property_id,
+              match_score: match.score,
+              match_reason: match.rationale,
+              updated_at: new Date(),
+            },
+          })
+
+          // Fetch the lead document to get phone/name for Vapi
+          const lead = (unmatchedLeads as any[]).find((l) => String(l._id) === match.client_id)
+
+          if (lead?.phone) {
+            const vapiResult = await ctx.vapi.triggerCampaignCall(
+              {
+                phone: lead.phone,
+                name: lead.name,
+                budget_range: lead.budget_range,
+                location_pref: lead.location_pref,
+                property_type: lead.property_type,
+                notes: lead.notes,
+              },
+              {
+                campaign_name: 'Matchmaker Outbound',
+                script_template: `We found a property that closely matches what you're looking for — ${matchedProperty?.title || 'a great option'} in ${matchedProperty?.location || lead.location_pref}. ${match.rationale} Would you like to schedule a visit?`,
+              }
+            )
+
+            if (vapiResult.success) {
+              await ctx.db.insertOne('calls', {
+                lead_id: match.client_id,
+                lead_name: lead.name,
+                lead_phone: lead.phone,
+                agent_name: 'The Matchmaker',
+                agent_id: process.env.VAPI_ASSISTANT_OUTBOUND_ID || 'system',
+                campaign_id: 'auto-matchmaker',
+                direction: 'outbound',
+                call_type: 'match_pitch',
+                duration: 0,
+                disposition: 'queued',
+                call_outcome: 'pending',
+                vapi_call_id: vapiResult.callId,
+                matched_property_id: match.property_id,
+                match_score: match.score,
+                created_at: new Date(),
+              })
+
+              callsTriggered++
+              match_details.push({
+                client_id: match.client_id,
+                property_id: match.property_id,
+                score: match.score,
+                rationale: match.rationale,
+                vapi_call_id: vapiResult.callId,
+                status: 'called',
+              })
+            } else {
+              match_details.push({
+                client_id: match.client_id,
+                property_id: match.property_id,
+                score: match.score,
+                status: 'match_updated_call_failed',
+                error: vapiResult.error,
+              })
+            }
+          } else {
+            match_details.push({
+              client_id: match.client_id,
+              property_id: match.property_id,
+              score: match.score,
+              status: 'match_updated_no_phone',
+            })
+          }
+
+          await new Promise((r) => setTimeout(r, 1000))
+        }
+
+        // ── Step 3: result_analysis ───────────────────────────────────────
+        await ctx.think('result_analysis',
+          `Matchmaker sweep complete. ${matches.length} pair(s) qualified (score ≥ 75). ${callsTriggered} Vapi call(s) triggered. ${matches.length - callsTriggered} updated without call (no phone or Vapi error).`,
+          {
+            confidence: 0.95,
+            metadata: { matches: matches.length, calls_triggered: callsTriggered },
+          }
+        )
+
+        return {
+          matches_found: matches.length,
+          calls_triggered: callsTriggered,
+          total_leads_scanned: unmatchedLeads.length,
+          match_details,
+          summary: `Matched ${matches.length} client–property pair(s); triggered ${callsTriggered} Vapi outbound call(s).`,
+        }
+      },
+    })
+
+    return NextResponse.json({
+      success: true,
+      runId,
+      matches_found: (output as any)?.matches_found ?? 0,
+      calls_triggered: (output as any)?.calls_triggered ?? 0,
+      summary: (output as any)?.summary ?? '',
+    })
+
+  } catch (error: any) {
+    console.error('[Cron/Matchmaker] Error:', error)
+    return NextResponse.json(
+      {
+        success: false,
+        runId: error?.runId,
+        run_id: error?.runId,
+        error: 'Matchmaker run failed',
+        detail: typeof error?.message === 'string' ? error.message : undefined,
+      },
+      { status: 200 }
+    )
+  }
+}

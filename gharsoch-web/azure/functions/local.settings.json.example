@@ -1,0 +1,11 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "WEBSITE_NODE_DEFAULT_VERSION": "~20",
+    "WEBSITE_TIME_ZONE": "India Standard Time",
+    "GHARSOCH_API_BASE": "http://localhost:3000",
+    "CRON_SECRET": "<paste-your-CRON_SECRET-from-gharsoch-web/.env-here>"
+  }
+}

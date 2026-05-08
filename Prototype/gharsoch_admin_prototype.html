@@ -1,0 +1,1658 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GharSoch · Operations</title>
+<style>
+  :root {
+    /* Warm cream palette */
+    --bg: #f5f0e6;
+    --bg-deep: #efe8d8;
+    --surface: #fbf8f1;
+    --surface-2: #f1ecdf;
+    --surface-3: #e8e1cf;
+    --ink: #1d1d1f;
+    --ink-2: #5a5651;
+    --ink-3: #8e8a82;
+    --ink-4: #b8b3a8;
+    --hairline: rgba(80,60,30,0.10);
+    --hairline-strong: rgba(80,60,30,0.18);
+
+    /* Single accent + supporting tones */
+    --accent: #0066cc;
+    --accent-soft: rgba(0,102,204,0.10);
+    --warm: #c2410c;
+    --warm-soft: rgba(194,65,12,0.10);
+    --green: #1a7c4a;
+    --green-soft: rgba(26,124,74,0.12);
+    --amber: #a06010;
+    --amber-soft: rgba(160,96,16,0.12);
+    --red: #a32319;
+    --red-soft: rgba(163,35,25,0.10);
+    --violet: #6e3ad6;
+    --violet-soft: rgba(110,58,214,0.10);
+
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+    --shadow-1: 0 1px 2px rgba(60,40,10,0.04), 0 8px 24px rgba(60,40,10,0.05);
+    --shadow-2: 0 1px 2px rgba(60,40,10,0.06), 0 16px 40px rgba(60,40,10,0.10);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Segoe UI", sans-serif;
+    font-size: 14px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--accent-soft); }
+
+  .shell { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+
+  /* ========== SIDEBAR ========== */
+  .sidebar {
+    border-right: 1px solid var(--hairline);
+    background: var(--surface);
+    padding: 20px 12px;
+    position: sticky; top: 0; height: 100vh;
+    display: flex; flex-direction: column;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 4px 10px 22px; }
+  .brand-mark {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, #ff8a4c, #d4541f);
+    border-radius: 9px; color: #fff; font-weight: 600;
+    display: grid; place-items: center; font-size: 14px;
+  }
+  .brand-name { font-weight: 600; font-size: 15px; line-height: 1.1; }
+  .brand-sub { color: var(--ink-3); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; margin-top: 3px; }
+
+  .nav-group { margin-top: 6px; }
+  .nav-label {
+    font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-3); padding: 14px 12px 6px;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 12px; border-radius: 8px; margin: 1px 0;
+    color: var(--ink-2); font-size: 13.5px; cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+  .nav-item:hover { background: var(--surface-2); color: var(--ink); }
+  .nav-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+  .nav-item .ico { width: 14px; opacity: 0.65; font-size: 13px; }
+  .nav-item.active .ico { opacity: 1; }
+  .nav-item .badge {
+    margin-left: auto;
+    background: var(--surface-3); color: var(--ink-3);
+    font-size: 10.5px; padding: 1px 7px; border-radius: 999px;
+    font-weight: 500;
+  }
+  .nav-item.active .badge { background: var(--accent); color: #fff; }
+
+  .sidebar-footer { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--hairline); }
+  .nav-mini { display: flex; gap: 4px; padding: 0 6px 8px; }
+  .nav-mini .nav-item { flex: 1; justify-content: center; padding: 6px; }
+  .user {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px; border-radius: 10px; cursor: pointer;
+    transition: background 0.15s;
+  }
+  .user:hover { background: var(--surface-2); }
+  .avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--surface-3); color: var(--ink-2);
+    display: grid; place-items: center; font-size: 11.5px; font-weight: 600;
+  }
+  .user-name { font-size: 13px; font-weight: 500; }
+  .user-role { font-size: 11px; color: var(--ink-3); }
+
+  /* ========== MAIN ========== */
+  .main { padding: 24px 36px 60px; max-width: 1320px; }
+  .page { display: none; animation: fade 0.25s ease both; }
+  .page.active { display: block; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  .crumb { color: var(--ink-3); font-size: 11.5px; letter-spacing: 0.05em; text-transform: uppercase; }
+  .head {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    margin: 8px 0 22px; gap: 18px;
+  }
+  .title { font-size: 27px; font-weight: 600; letter-spacing: -0.015em; line-height: 1.15; }
+  .sub { color: var(--ink-3); margin-top: 5px; font-size: 13.5px; max-width: 640px; }
+
+  .actions { display: flex; gap: 8px; align-items: center; }
+  .btn {
+    appearance: none; border: 1px solid var(--hairline-strong);
+    background: var(--surface); color: var(--ink);
+    padding: 7px 14px; border-radius: 8px;
+    font-size: 13px; font-weight: 500; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 7px;
+    transition: background 0.15s ease, transform 0.1s ease, border-color 0.15s ease;
+    font-family: inherit;
+  }
+  .btn:hover { background: var(--surface-2); border-color: var(--ink-4); }
+  .btn:active { transform: scale(0.98); }
+  .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn.primary:hover { background: #0058b0; border-color: #0058b0; }
+  .btn.warm { background: var(--warm); color: #fff; border-color: var(--warm); }
+  .btn.warm:hover { background: #a83608; }
+  .btn.ghost { background: transparent; border-color: transparent; }
+  .btn.ghost:hover { background: var(--surface-2); }
+  .btn.sm { padding: 4px 10px; font-size: 12px; }
+  .btn .kbd {
+    background: var(--surface-2); padding: 1px 6px; border-radius: 4px;
+    font-size: 10.5px; color: var(--ink-3); font-family: ui-monospace, SF Mono, Menlo, monospace;
+  }
+
+  /* ========== PILLS ========== */
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 9px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 500;
+  }
+  .pill.success { background: var(--green-soft); color: var(--green); }
+  .pill.failed { background: var(--red-soft); color: var(--red); }
+  .pill.running { background: var(--accent-soft); color: var(--accent); }
+  .pill.idle { background: var(--surface-3); color: var(--ink-3); }
+  .pill.warm { background: var(--warm-soft); color: var(--warm); }
+  .pill.violet { background: var(--violet-soft); color: var(--violet); }
+  .pill.amber { background: var(--amber-soft); color: var(--amber); }
+
+  .pulse {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 0 0 rgba(26,124,74,0.45);
+    animation: pulse 1.6s infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(26,124,74,0.45); }
+    70% { box-shadow: 0 0 0 8px rgba(26,124,74,0); }
+    100% { box-shadow: 0 0 0 0 rgba(26,124,74,0); }
+  }
+  .live { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--green); font-weight: 500; }
+
+  /* ========== HEALTH STRIP ========== */
+  .strip {
+    display: grid; grid-template-columns: repeat(6, 1fr);
+    gap: 1px; background: var(--hairline);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-md); overflow: hidden;
+    margin-bottom: 22px;
+  }
+  .stat { background: var(--surface); padding: 13px 16px; display: flex; flex-direction: column; gap: 3px; }
+  .stat-label { color: var(--ink-3); font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .stat-value { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+  .stat-delta { font-size: 11px; color: var(--ink-3); }
+
+  /* ========== TABS ========== */
+  .tabs { display: flex; gap: 22px; border-bottom: 1px solid var(--hairline); margin-bottom: 20px; }
+  .tab {
+    padding: 9px 0; font-size: 13.5px; color: var(--ink-3);
+    cursor: pointer; border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .tab:hover { color: var(--ink); }
+  .tab.active { color: var(--ink); border-bottom-color: var(--ink); font-weight: 500; }
+
+  /* ========== AGENTS ========== */
+  .agents { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 26px; }
+  .agent {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-lg);
+    padding: 18px; cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    animation: rise 0.4s ease both;
+  }
+  .agent:hover { border-color: var(--hairline-strong); box-shadow: var(--shadow-1); }
+  .agent.expanded { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  .agent-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .agent-name { font-weight: 600; font-size: 15px; letter-spacing: -0.005em; }
+  .agent-purpose { color: var(--ink-3); font-size: 12.5px; margin-top: 4px; line-height: 1.45; }
+  .agent-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: grid; place-items: center; font-size: 16px;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .agent-icon.amber { background: var(--amber-soft); color: var(--amber); }
+  .agent-icon.green { background: var(--green-soft); color: var(--green); }
+  .agent-icon.violet { background: var(--violet-soft); color: var(--violet); }
+  .agent-icon.warm { background: var(--warm-soft); color: var(--warm); }
+
+  .agent-counters { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 14px; }
+  .counter { background: var(--surface-2); border-radius: 8px; padding: 9px 10px; }
+  .counter-label { font-size: 10px; color: var(--ink-3); letter-spacing: 0.05em; text-transform: uppercase; }
+  .counter-value { font-size: 16px; font-weight: 600; margin-top: 2px; letter-spacing: -0.01em; }
+
+  .agent-row {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 14px; padding-top: 12px;
+    border-top: 1px solid var(--hairline);
+    font-size: 12px; color: var(--ink-3);
+  }
+  .agent-row b { color: var(--ink); font-weight: 600; }
+  .agent-row > div { display: flex; gap: 12px; align-items: center; }
+
+  .agent-expanded {
+    margin-top: 14px; padding-top: 14px;
+    border-top: 1px dashed var(--hairline-strong);
+    display: none;
+  }
+  .agent.expanded .agent-expanded { display: block; animation: fade 0.25s ease both; }
+  .expanded-title {
+    font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink-3); margin-bottom: 6px;
+  }
+  .match-row {
+    display: grid; grid-template-columns: 1fr auto;
+    gap: 10px; padding: 10px 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .match-row:last-child { border-bottom: none; }
+  .match-pair { font-size: 13px; }
+  .match-meta { color: var(--ink-3); font-size: 12px; margin-top: 3px; }
+  .match-rationale { color: var(--ink-2); font-size: 12px; margin-top: 4px; line-height: 1.45; }
+  .score {
+    font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px;
+    background: var(--green-soft); color: var(--green); white-space: nowrap;
+  }
+  .score.warn { background: var(--amber-soft); color: var(--amber); }
+  .vapi-link { color: var(--accent); font-size: 11.5px; margin-top: 6px; display: inline-block; cursor: pointer; }
+  .vapi-link:hover { text-decoration: underline; }
+
+  /* ========== PANELS / CARDS ========== */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin-bottom: 22px;
+  }
+  .panel-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 18px; border-bottom: 1px solid var(--hairline);
+  }
+  .panel-title { font-weight: 600; font-size: 14.5px; }
+  .panel-sub { color: var(--ink-3); font-size: 12px; }
+  .panel-body { padding: 18px; }
+
+  /* ========== TABLES ========== */
+  .table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .table th {
+    text-align: left; font-weight: 500; color: var(--ink-3);
+    font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase;
+    padding: 12px 16px; border-bottom: 1px solid var(--hairline);
+    background: var(--surface-2);
+  }
+  .table td {
+    padding: 12px 16px; border-bottom: 1px solid var(--hairline);
+    vertical-align: middle;
+  }
+  .table tr { cursor: pointer; transition: background 0.12s; }
+  .table tr:hover td { background: var(--surface-2); }
+  .table tr:last-child td { border-bottom: none; }
+  .table .name { font-weight: 500; }
+  .table .meta { color: var(--ink-3); font-size: 12px; margin-top: 2px; }
+
+  /* ========== ACTIVITY LOG ========== */
+  .row {
+    display: grid;
+    grid-template-columns: 80px 130px 1fr 90px 24px;
+    gap: 14px; align-items: center;
+    padding: 11px 18px;
+    border-bottom: 1px solid var(--hairline);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .row:hover { background: var(--surface-2); }
+  .row:last-child { border-bottom: none; }
+  .row .ts { color: var(--ink-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .row .agent-tag {
+    font-size: 11px; padding: 3px 8px; border-radius: 6px;
+    width: fit-content; font-weight: 500;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .row .agent-tag.amber { background: var(--amber-soft); color: var(--amber); }
+  .row .agent-tag.violet { background: var(--violet-soft); color: var(--violet); }
+  .row .agent-tag.green { background: var(--green-soft); color: var(--green); }
+  .row .agent-tag.red { background: var(--red-soft); color: var(--red); }
+  .row .summary { font-size: 13px; color: var(--ink); }
+  .row .arrow { color: var(--ink-3); font-size: 14px; text-align: right; }
+
+  /* ========== KANBAN ========== */
+  .kanban { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  .col {
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-md);
+    padding: 10px;
+    min-height: 400px;
+  }
+  .col-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 4px 6px 10px;
+    font-size: 12px; font-weight: 600;
+    color: var(--ink-2);
+  }
+  .col-head .count {
+    background: var(--surface); color: var(--ink-3);
+    font-size: 11px; padding: 1px 7px; border-radius: 999px;
+  }
+  .lcard {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    padding: 11px 12px; margin-bottom: 8px;
+    cursor: pointer; transition: box-shadow 0.15s, transform 0.1s;
+  }
+  .lcard:hover { box-shadow: var(--shadow-1); }
+  .lcard:active { transform: scale(0.99); }
+  .lcard-name { font-size: 13px; font-weight: 500; }
+  .lcard-meta { font-size: 11.5px; color: var(--ink-3); margin-top: 3px; }
+  .lcard-tags { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+  .tag {
+    background: var(--surface-2); color: var(--ink-2);
+    font-size: 10.5px; padding: 1px 7px; border-radius: 999px;
+  }
+  .tag.hot { background: var(--red-soft); color: var(--red); }
+  .tag.warm-t { background: var(--amber-soft); color: var(--amber); }
+  .tag.cold { background: var(--surface-3); color: var(--ink-3); }
+
+  /* ========== PROPERTIES GRID ========== */
+  .pgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .pcard {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    cursor: pointer;
+    transition: box-shadow 0.2s, transform 0.15s;
+  }
+  .pcard:hover { box-shadow: var(--shadow-1); transform: translateY(-1px); }
+  .pcard-img {
+    height: 130px;
+    background: linear-gradient(135deg, #d4ad7c 0%, #c2906c 100%);
+    position: relative;
+  }
+  .pcard-img.b { background: linear-gradient(135deg, #b9a890 0%, #8e7e6a 100%); }
+  .pcard-img.c { background: linear-gradient(135deg, #c4b08e 0%, #9c8a72 100%); }
+  .pcard-img.d { background: linear-gradient(135deg, #a8b5a0 0%, #7e8e7c 100%); }
+  .pcard-img .ribbon {
+    position: absolute; top: 10px; left: 10px;
+    background: rgba(255,255,255,0.92);
+    color: var(--ink); font-size: 11px; font-weight: 500;
+    padding: 3px 9px; border-radius: 6px;
+  }
+  .pcard-body { padding: 14px; }
+  .pcard-title { font-weight: 600; font-size: 14px; }
+  .pcard-meta { color: var(--ink-3); font-size: 12px; margin-top: 4px; }
+  .pcard-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--hairline); }
+  .price { font-weight: 600; font-size: 14.5px; letter-spacing: -0.01em; }
+
+  /* ========== APPOINTMENTS ========== */
+  .apt-row {
+    display: grid; grid-template-columns: 60px 1fr auto;
+    gap: 14px; padding: 14px 18px;
+    border-bottom: 1px solid var(--hairline);
+    cursor: pointer; transition: background 0.12s;
+  }
+  .apt-row:hover { background: var(--surface-2); }
+  .apt-row:last-child { border-bottom: none; }
+  .apt-time {
+    background: var(--surface-2); border-radius: 8px;
+    padding: 8px 6px; text-align: center;
+  }
+  .apt-time-h { font-size: 14px; font-weight: 600; line-height: 1.1; }
+  .apt-time-d { font-size: 10.5px; color: var(--ink-3); margin-top: 2px; letter-spacing: 0.05em; text-transform: uppercase; }
+
+  /* ========== CALL LOGS ========== */
+  .call-row {
+    display: grid; grid-template-columns: 38px 1fr 80px 110px 90px;
+    gap: 14px; align-items: center;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--hairline);
+    cursor: pointer; transition: background 0.12s;
+  }
+  .call-row:hover { background: var(--surface-2); }
+  .call-row:last-child { border-bottom: none; }
+  .icn-circle {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--green-soft); color: var(--green);
+    font-size: 13px;
+  }
+  .icn-circle.in { background: var(--accent-soft); color: var(--accent); }
+  .icn-circle.miss { background: var(--red-soft); color: var(--red); }
+
+  /* ========== KB ========== */
+  .kb-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .kb-card {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-lg);
+    padding: 16px; cursor: pointer;
+    transition: box-shadow 0.2s, transform 0.15s;
+  }
+  .kb-card:hover { box-shadow: var(--shadow-1); transform: translateY(-1px); }
+  .kb-builder {
+    width: 40px; height: 40px; border-radius: 10px;
+    display: grid; place-items: center;
+    background: var(--warm-soft); color: var(--warm);
+    font-weight: 600; font-size: 14px;
+    margin-bottom: 12px;
+  }
+  .rep-bar {
+    height: 4px; background: var(--surface-3); border-radius: 999px; overflow: hidden;
+    margin-top: 10px;
+  }
+  .rep-fill { height: 100%; background: var(--green); border-radius: 999px; }
+
+  /* ========== CHARTS (SVG) ========== */
+  .chart-wrap { padding: 18px; }
+  .funnel-row {
+    display: grid; grid-template-columns: 120px 1fr 60px;
+    gap: 12px; align-items: center;
+    padding: 8px 0;
+  }
+  .funnel-bar {
+    height: 22px; border-radius: 6px;
+    background: linear-gradient(90deg, var(--accent), #4a93dd);
+  }
+  .funnel-bar.warm { background: linear-gradient(90deg, var(--warm), #e8702f); }
+  .funnel-bar.green { background: linear-gradient(90deg, var(--green), #4ca775); }
+
+  /* ========== SYSTEM MAP ========== */
+  .map-wrap { padding: 22px; }
+  .map { display: grid; grid-template-columns: 1fr 24px 1fr 24px 1fr; gap: 10px; align-items: center; }
+  .node {
+    background: var(--surface-2); border: 1px solid var(--hairline);
+    border-radius: 10px; padding: 12px;
+    text-align: center; font-size: 12px; color: var(--ink-2);
+  }
+  .node b { display: block; color: var(--ink); font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .node.live { border-color: var(--accent); background: var(--accent-soft); }
+  .arrow-h { height: 1px; background: var(--hairline-strong); position: relative; }
+  .arrow-h.live { background: var(--accent); }
+  .arrow-h.live::after {
+    content: ""; position: absolute; right: -2px; top: -2px;
+    width: 5px; height: 5px; border-radius: 50%; background: var(--accent);
+    animation: pulse 1.4s infinite;
+  }
+
+  /* ========== DRAWER ========== */
+  .drawer-bg {
+    position: fixed; inset: 0; background: rgba(40,30,10,0.22);
+    backdrop-filter: blur(6px); opacity: 0; pointer-events: none;
+    transition: opacity 0.25s; z-index: 50;
+  }
+  .drawer-bg.open { opacity: 1; pointer-events: auto; }
+  .drawer {
+    position: fixed; top: 0; right: 0; height: 100vh; width: 560px; max-width: 92vw;
+    background: var(--surface); border-left: 1px solid var(--hairline);
+    box-shadow: var(--shadow-2);
+    transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    z-index: 60; overflow-y: auto;
+  }
+  .drawer.open { transform: none; }
+  .drawer-head {
+    padding: 18px 22px; border-bottom: 1px solid var(--hairline);
+    display: flex; justify-content: space-between; align-items: flex-start;
+    position: sticky; top: 0; background: var(--surface); z-index: 1;
+  }
+  .drawer h3 { margin: 0; font-size: 16px; font-weight: 600; }
+  .drawer .runid { color: var(--ink-3); font-size: 11px; font-family: ui-monospace, SF Mono, Menlo, monospace; margin-top: 4px; }
+  .drawer-close { background: none; border: none; cursor: pointer; font-size: 18px; color: var(--ink-3); padding: 4px 8px; border-radius: 6px; }
+  .drawer-close:hover { background: var(--surface-2); color: var(--ink); }
+  .drawer-section { padding: 16px 22px; border-bottom: 1px solid var(--hairline); }
+  .drawer-section h4 { margin: 0 0 10px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+  .step {
+    padding: 10px 12px; border-radius: 8px; background: var(--surface-2);
+    font-size: 12.5px; margin-bottom: 8px; line-height: 1.5;
+  }
+  .step .kind { font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 3px; }
+  .step.tool .kind { color: var(--violet); }
+  .step.decision .kind { color: var(--accent); }
+  .step.eval .kind { color: var(--ink-2); }
+  .code {
+    background: #1d1d1f; color: #f5f1e8; padding: 12px 14px;
+    border-radius: 8px; font-family: ui-monospace, SF Mono, Menlo, monospace;
+    font-size: 11.5px; line-height: 1.55; overflow-x: auto;
+    white-space: pre;
+  }
+  .transcript-line {
+    padding: 8px 0; border-bottom: 1px solid var(--hairline);
+    font-size: 12.5px;
+  }
+  .transcript-line:last-child { border-bottom: none; }
+  .transcript-line b { color: var(--accent); font-weight: 500; }
+  .transcript-line.cust b { color: var(--warm); }
+
+  /* ========== MODAL ========== */
+  .modal {
+    position: fixed; inset: 0; display: none;
+    align-items: center; justify-content: center;
+    background: rgba(40,30,10,0.32); backdrop-filter: blur(6px);
+    z-index: 70;
+  }
+  .modal.open { display: flex; }
+  .modal-card {
+    background: var(--surface); border-radius: var(--radius-xl);
+    width: 520px; max-width: 92vw; max-height: 88vh; overflow-y: auto;
+    box-shadow: var(--shadow-2);
+    animation: rise 0.25s ease both;
+  }
+  .modal-head {
+    padding: 20px 24px 12px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .modal-head h3 { margin: 0; font-size: 17px; font-weight: 600; }
+  .modal-body { padding: 8px 24px 20px; }
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block; font-size: 11.5px; letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--ink-3); margin-bottom: 6px; font-weight: 500;
+  }
+  .field input, .field select, .field textarea {
+    width: 100%; padding: 9px 12px;
+    border: 1px solid var(--hairline-strong); border-radius: 8px;
+    background: var(--bg); color: var(--ink);
+    font-size: 13.5px; font-family: inherit;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .modal-foot {
+    padding: 14px 24px 20px; display: flex; justify-content: flex-end; gap: 8px;
+    border-top: 1px solid var(--hairline); margin-top: 8px;
+  }
+
+  /* ========== COMMAND PALETTE ========== */
+  .cmd-overlay {
+    position: fixed; inset: 0; display: none;
+    align-items: flex-start; justify-content: center;
+    background: rgba(40,30,10,0.32); backdrop-filter: blur(6px);
+    z-index: 80; padding-top: 14vh;
+  }
+  .cmd-overlay.open { display: flex; }
+  .cmd {
+    width: 580px; max-width: 92vw;
+    background: var(--surface); border-radius: 14px;
+    box-shadow: var(--shadow-2);
+    overflow: hidden;
+    animation: rise 0.2s ease both;
+  }
+  .cmd-input {
+    width: 100%; border: none; background: transparent;
+    padding: 18px 20px; font-size: 15px; font-family: inherit;
+    border-bottom: 1px solid var(--hairline);
+    outline: none; color: var(--ink);
+  }
+  .cmd-list { max-height: 380px; overflow-y: auto; padding: 6px; }
+  .cmd-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; border-radius: 8px; cursor: pointer; gap: 12px;
+    transition: background 0.1s;
+  }
+  .cmd-item:hover, .cmd-item.focus { background: var(--surface-2); }
+  .cmd-item .lbl { font-size: 13.5px; }
+  .cmd-item .ctx { font-size: 11.5px; color: var(--ink-3); }
+  .cmd-foot {
+    padding: 8px 14px; border-top: 1px solid var(--hairline);
+    font-size: 11px; color: var(--ink-3);
+    display: flex; justify-content: space-between;
+  }
+
+  /* ========== TOAST ========== */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--ink); color: #fbf8f1;
+    padding: 10px 18px; border-radius: 10px;
+    font-size: 13px; opacity: 0; pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 90;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ========== SETTINGS ========== */
+  .settings-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 0; border-bottom: 1px solid var(--hairline);
+  }
+  .settings-row:last-child { border-bottom: none; }
+  .settings-row .lbl { font-size: 13.5px; font-weight: 500; }
+  .settings-row .desc { font-size: 12px; color: var(--ink-3); margin-top: 3px; }
+  .switch {
+    width: 38px; height: 22px; border-radius: 999px;
+    background: var(--surface-3); position: relative; cursor: pointer;
+    transition: background 0.2s;
+  }
+  .switch::after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+    transition: left 0.2s;
+  }
+  .switch.on { background: var(--accent); }
+  .switch.on::after { left: 18px; }
+
+  @media screen and (max-width: 1100px) {
+    .agents, .pgrid, .kb-grid { grid-template-columns: repeat(2, 1fr); }
+    .strip { grid-template-columns: repeat(3, 1fr); }
+    .kanban { grid-template-columns: repeat(2, 1fr); overflow-x: auto; }
+  }
+  @media screen and (max-width: 760px) {
+    .shell { grid-template-columns: 1fr; }
+    .sidebar { position: static; height: auto; }
+    .agents, .pgrid, .kb-grid { grid-template-columns: 1fr; }
+    .strip { grid-template-columns: repeat(2, 1fr); }
+    .drawer { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ===================== SIDEBAR ===================== -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">G</div>
+      <div>
+        <div class="brand-name">GharSoch</div>
+        <div class="brand-sub">Voice Agent</div>
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Work</div>
+      <div class="nav-item" data-page="dashboard"><span class="ico">▦</span> Dashboard</div>
+      <div class="nav-item" data-page="leads"><span class="ico">⌗</span> Leads Pipeline <span class="badge">52</span></div>
+      <div class="nav-item" data-page="clients"><span class="ico">○</span> Clients <span class="badge">14</span></div>
+      <div class="nav-item" data-page="properties"><span class="ico">⌂</span> Properties</div>
+      <div class="nav-item" data-page="campaigns"><span class="ico">▷</span> Campaigns</div>
+      <div class="nav-item" data-page="appointments"><span class="ico">◷</span> Appointments <span class="badge">4</span></div>
+      <div class="nav-item" data-page="calls"><span class="ico">≡</span> Call Logs</div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Intelligence</div>
+      <div class="nav-item active" data-page="ops"><span class="ico">◉</span> AI Operations</div>
+      <div class="nav-item" data-page="activity"><span class="ico">⌽</span> Agent Activity</div>
+      <div class="nav-item" data-page="kb"><span class="ico">▤</span> Knowledge Base</div>
+      <div class="nav-item" data-page="analytics"><span class="ico">◬</span> Analytics</div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="nav-mini">
+        <div class="nav-item" data-page="settings" title="Settings"><span class="ico">⚙</span></div>
+        <div class="nav-item" onclick="openCmd()" title="Search ⌘K"><span class="ico">⌘</span></div>
+        <div class="nav-item" onclick="toast('Help docs coming soon')" title="Help"><span class="ico">?</span></div>
+      </div>
+      <div class="user" onclick="toast('Profile menu')">
+        <div class="avatar">AU</div>
+        <div>
+          <div class="user-name">Anurag U.</div>
+          <div class="user-role">Admin · Production</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===================== MAIN ===================== -->
+  <main class="main">
+
+    <!-- ============ DASHBOARD ============ -->
+    <section class="page" id="page-dashboard">
+      <div class="crumb">Work · Dashboard</div>
+      <div class="head">
+        <div>
+          <div class="title">Good evening, Anurag</div>
+          <div class="sub">Here's what your AI agents have been doing while you were away.</div>
+        </div>
+        <div class="actions">
+          <button class="btn" onclick="openCmd()"><span class="kbd">⌘K</span> Search</button>
+          <button class="btn" onclick="openModal('new-client')">+ New Client</button>
+          <button class="btn primary" onclick="switchPage('ops')">Open Operations</button>
+        </div>
+      </div>
+
+      <div class="strip">
+        <div class="stat"><span class="stat-label">New leads · 24h</span><span class="stat-value">9</span><span class="stat-delta">+3 vs yesterday</span></div>
+        <div class="stat"><span class="stat-label">Calls dialed</span><span class="stat-value">28</span><span class="stat-delta">22 connected</span></div>
+        <div class="stat"><span class="stat-label">Site visits booked</span><span class="stat-value">5</span><span class="stat-delta">3 confirmed for tmrw</span></div>
+        <div class="stat"><span class="stat-label">Hot leads</span><span class="stat-value">11</span><span class="stat-delta">2 new today</span></div>
+        <div class="stat"><span class="stat-label">Active campaigns</span><span class="stat-value">2</span><span class="stat-delta">38 / 100 dialed</span></div>
+        <div class="stat"><span class="stat-label">Properties live</span><span class="stat-value">42</span><span class="stat-delta">7 in negotiation</span></div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 2fr 1fr; gap: 16px;">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Lead funnel · last 7 days</div>
+              <div class="panel-sub">From client created → to site visit booked</div>
+            </div>
+            <button class="btn ghost sm">View report</button>
+          </div>
+          <div class="chart-wrap">
+            <div class="funnel-row"><div>Clients added</div><div class="funnel-bar" style="width:100%"></div><div style="text-align:right;font-weight:600;">68</div></div>
+            <div class="funnel-row"><div>Converted to lead</div><div class="funnel-bar" style="width:78%"></div><div style="text-align:right;font-weight:600;">53</div></div>
+            <div class="funnel-row"><div>Matched to property</div><div class="funnel-bar warm" style="width:60%"></div><div style="text-align:right;font-weight:600;">41</div></div>
+            <div class="funnel-row"><div>Vapi call connected</div><div class="funnel-bar warm" style="width:42%"></div><div style="text-align:right;font-weight:600;">29</div></div>
+            <div class="funnel-row"><div>Site visit booked</div><div class="funnel-bar green" style="width:26%"></div><div style="text-align:right;font-weight:600;">18</div></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-title">Today's plan</div>
+          </div>
+          <div style="padding: 6px 0;">
+            <div class="apt-row"><div class="apt-time"><div class="apt-time-h">09:00</div><div class="apt-time-d">Today</div></div><div><div class="name">Appt Guardian sweep</div><div class="meta">4 site visits to confirm for tmrw</div></div><div><span class="pill idle">queued</span></div></div>
+            <div class="apt-row"><div class="apt-time"><div class="apt-time-h">10:00</div><div class="apt-time-d">Today</div></div><div><div class="name">Re-engager run</div><div class="meta">Cold leads &gt; 60 days</div></div><div><span class="pill idle">queued</span></div></div>
+            <div class="apt-row"><div class="apt-time"><div class="apt-time-h">11:00</div><div class="apt-time-d">Today</div></div><div><div class="name">Prestige Lakeside · Priya</div><div class="meta">Site visit · Whitefield</div></div><div><span class="pill success">confirmed</span></div></div>
+            <div class="apt-row"><div class="apt-time"><div class="apt-time-h">14:00</div><div class="apt-time-d">Today</div></div><div><div class="name">Mohan R. · Prestige Lakeside</div><div class="meta">Site visit · Whitefield</div></div><div><span class="pill success">confirmed</span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div><div class="panel-title">Recent agent activity</div><div class="panel-sub">Last 8 events across all 5 agents</div></div>
+          <button class="btn ghost sm" onclick="switchPage('ops')">Open AI Operations →</button>
+        </div>
+        <div class="row" onclick="openDrawer('Matchmaker run · 19:23:21')"><div class="ts">19:23:21</div><div><span class="agent-tag">Matchmaker</span></div><div class="summary">Scanned 1 client · <b>3 matches</b> · triggered 1 outbound call</div><div><span class="pill success">success</span></div><div class="arrow">›</div></div>
+        <div class="row" onclick="openDrawer('Appointment booked')"><div class="ts">19:25:48</div><div><span class="agent-tag amber">Appt</span></div><div class="summary">Booked site visit · Prestige Lakeside · Sat 11:00</div><div><span class="pill success">success</span></div><div class="arrow">›</div></div>
+        <div class="row" onclick="openDrawer('Follow-Up sweep')"><div class="ts">19:00:04</div><div><span class="agent-tag green">Follow-Up</span></div><div class="summary">Hourly sweep · 3 dialed, 5 in TRAI window, 3 skipped DND</div><div><span class="pill success">success</span></div><div class="arrow">›</div></div>
+        <div class="row" onclick="openDrawer('Price drop event')"><div class="ts">14:08:11</div><div><span class="agent-tag red">Price-Drop</span></div><div class="summary">Whitefield 3BHK ₹1.45→1.40 Cr · 4 leads notified · 2 booked</div><div><span class="pill success">success</span></div><div class="arrow">›</div></div>
+      </div>
+    </section>
+
+    <!-- ============ LEADS PIPELINE ============ -->
+    <section class="page" id="page-leads">
+      <div class="crumb">Work · Leads Pipeline</div>
+      <div class="head">
+        <div>
+          <div class="title">Leads pipeline</div>
+          <div class="sub">Drag a lead between stages, or click to open detail.</div>
+        </div>
+        <div class="actions">
+          <button class="btn ghost"><span style="font-size:11px">🔍</span> Filter</button>
+          <button class="btn"><span style="font-size:12px">↓</span> Export CSV</button>
+          <button class="btn primary" onclick="openModal('new-client')">+ New Lead</button>
+        </div>
+      </div>
+
+      <div class="strip">
+        <div class="stat"><span class="stat-label">Total</span><span class="stat-value">52</span></div>
+        <div class="stat"><span class="stat-label">Hot</span><span class="stat-value">11</span></div>
+        <div class="stat"><span class="stat-label">Warm</span><span class="stat-value">23</span></div>
+        <div class="stat"><span class="stat-label">Cold</span><span class="stat-value">14</span></div>
+        <div class="stat"><span class="stat-label">DNC</span><span class="stat-value">4</span></div>
+        <div class="stat"><span class="stat-label">Conversion %</span><span class="stat-value">26%</span></div>
+      </div>
+
+      <div class="kanban">
+        <div class="col">
+          <div class="col-head">New <span class="count">8</span></div>
+          <div class="lcard" onclick="openDrawer('Priya Sharma · Lead detail')"><div class="lcard-name">Priya Sharma</div><div class="lcard-meta">Whitefield · 3BHK · ₹1.4 Cr</div><div class="lcard-tags"><span class="tag hot">hot</span><span class="tag">3 mo</span></div></div>
+          <div class="lcard"><div class="lcard-name">Vikram Joshi</div><div class="lcard-meta">HSR · 2BHK · ₹85 L</div><div class="lcard-tags"><span class="tag warm-t">warm</span></div></div>
+          <div class="lcard"><div class="lcard-name">Aisha Sayed</div><div class="lcard-meta">Bandra · 2BHK</div><div class="lcard-tags"><span class="tag warm-t">warm</span></div></div>
+        </div>
+        <div class="col">
+          <div class="col-head">Contacted <span class="count">14</span></div>
+          <div class="lcard"><div class="lcard-name">Rahul Mehta</div><div class="lcard-meta">Panathur · 2BHK</div><div class="lcard-tags"><span class="tag hot">hot</span><span class="tag">callback Sat</span></div></div>
+          <div class="lcard"><div class="lcard-name">Suresh P.</div><div class="lcard-meta">HSR · 3BHK</div><div class="lcard-tags"><span class="tag warm-t">warm</span></div></div>
+        </div>
+        <div class="col">
+          <div class="col-head">Site visit <span class="count">9</span></div>
+          <div class="lcard"><div class="lcard-name">Mohan R.</div><div class="lcard-meta">Prestige Lakeside · 14:00 today</div><div class="lcard-tags"><span class="tag hot">hot</span></div></div>
+          <div class="lcard"><div class="lcard-name">Geetha Iyer</div><div class="lcard-meta">Brigade Cornerstone · Sat</div><div class="lcard-tags"><span class="tag warm-t">warm</span></div></div>
+        </div>
+        <div class="col">
+          <div class="col-head">Negotiation <span class="count">6</span></div>
+          <div class="lcard"><div class="lcard-name">Karthik N.</div><div class="lcard-meta">Sobha Dream · price obj.</div><div class="lcard-tags"><span class="tag warm-t">warm</span><span class="tag">-5L offer</span></div></div>
+        </div>
+        <div class="col">
+          <div class="col-head">Closed <span class="count">3</span></div>
+          <div class="lcard"><div class="lcard-name">Deepak V.</div><div class="lcard-meta">Prestige Lakeside · ₹1.4 Cr</div><div class="lcard-tags"><span class="tag" style="background:var(--green-soft);color:var(--green)">won</span></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ CLIENTS ============ -->
+    <section class="page" id="page-clients">
+      <div class="crumb">Work · Clients</div>
+      <div class="head">
+        <div>
+          <div class="title">Clients</div>
+          <div class="sub">Raw clients before they become leads. Conversion runs automatically through the Client→Lead Converter agent.</div>
+        </div>
+        <div class="actions">
+          <button class="btn">↑ Import CSV</button>
+          <button class="btn primary" onclick="openModal('new-client')">+ New Client</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">14 clients · 11 converted, 2 converting, 1 rejected</div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn ghost sm">All</button>
+            <button class="btn ghost sm">Converting</button>
+            <button class="btn ghost sm">Rejected</button>
+          </div>
+        </div>
+        <table class="table">
+          <thead><tr><th>Name</th><th>Phone</th><th>Source</th><th>Preferences</th><th>Conversion</th><th>Created</th></tr></thead>
+          <tbody>
+            <tr onclick="openDrawer('Priya Sharma · Client detail')"><td><div class="name">Priya Sharma</div><div class="meta">priya.s@gmail.com</div></td><td>+91 98xxx 21567</td><td>Web form</td><td>Whitefield · 3BHK · ₹1.2–1.5 Cr</td><td><span class="pill success">converted · lead_score 88</span></td><td>2 min ago</td></tr>
+            <tr><td><div class="name">Karthik Nair</div><div class="meta">k.nair@protonmail.com</div></td><td>+91 99xxx 14290</td><td>CSV upload</td><td>HSR · 2BHK · ₹70–90 L</td><td><span class="pill running">converting</span></td><td>5 min ago</td></tr>
+            <tr><td><div class="name">Deepak Vohra</div><div class="meta">—</div></td><td>+91 87xxx 99014</td><td>Manual</td><td>Bandra · 2BHK</td><td><span class="pill success">converted · lead_score 76</span></td><td>22 min ago</td></tr>
+            <tr><td><div class="name">Anonymous</div><div class="meta">—</div></td><td>+91 77xxx 30022</td><td>Web form</td><td>(no preferences)</td><td><span class="pill failed">rejected · insufficient info</span></td><td>1 h ago</td></tr>
+            <tr><td><div class="name">Geetha Iyer</div><div class="meta">geetha.i@yahoo.com</div></td><td>+91 98xxx 70061</td><td>CSV upload</td><td>Whitefield · 3BHK</td><td><span class="pill success">converted · lead_score 81</span></td><td>3 h ago</td></tr>
+            <tr><td><div class="name">Rahul Mehta</div><div class="meta">rahul.m@gmail.com</div></td><td>+91 98xxx 99221</td><td>Web form</td><td>Panathur · 2BHK · ₹70–95 L</td><td><span class="pill success">converted · lead_score 79</span></td><td>5 h ago</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ PROPERTIES ============ -->
+    <section class="page" id="page-properties">
+      <div class="crumb">Work · Properties</div>
+      <div class="head">
+        <div>
+          <div class="title">Property inventory</div>
+          <div class="sub">42 active listings · 7 in negotiation. Lowering price triggers the Price-Drop agent automatically.</div>
+        </div>
+        <div class="actions">
+          <button class="btn ghost"><span>🔍</span> Filter</button>
+          <button class="btn">⊞ Grid</button>
+          <button class="btn primary" onclick="openModal('new-property')">+ Add Property</button>
+        </div>
+      </div>
+
+      <div class="pgrid">
+        <div class="pcard" onclick="openDrawer('Prestige Lakeside Habitat')">
+          <div class="pcard-img"><span class="ribbon">Available</span></div>
+          <div class="pcard-body">
+            <div class="pcard-title">Prestige Lakeside Habitat</div>
+            <div class="pcard-meta">Whitefield · 3BHK · 1,840 sqft · Prestige Group</div>
+            <div class="pcard-foot"><span class="price">₹1.40 Cr</span><span class="pill warm">price ↓ 3.4%</span></div>
+          </div>
+        </div>
+        <div class="pcard">
+          <div class="pcard-img b"><span class="ribbon">Available</span></div>
+          <div class="pcard-body">
+            <div class="pcard-title">Sobha Dream Acres</div>
+            <div class="pcard-meta">Panathur · 2BHK · 1,210 sqft · Sobha Ltd</div>
+            <div class="pcard-foot"><span class="price">₹85 L</span><span class="pill idle">stable</span></div>
+          </div>
+        </div>
+        <div class="pcard">
+          <div class="pcard-img c"><span class="ribbon">In negotiation</span></div>
+          <div class="pcard-body">
+            <div class="pcard-title">Brigade Cornerstone</div>
+            <div class="pcard-meta">Whitefield · 3BHK · 1,920 sqft · Brigade Group</div>
+            <div class="pcard-foot"><span class="price">₹1.6 Cr</span><span class="pill amber">2 leads</span></div>
+          </div>
+        </div>
+        <div class="pcard">
+          <div class="pcard-img d"><span class="ribbon">Available</span></div>
+          <div class="pcard-body">
+            <div class="pcard-title">DLF The Camellias</div>
+            <div class="pcard-meta">Sector 42 · 4BHK · 7,250 sqft · DLF</div>
+            <div class="pcard-foot"><span class="price">₹12.5 Cr</span><span class="pill idle">premium</span></div>
+          </div>
+        </div>
+        <div class="pcard">
+          <div class="pcard-img"><span class="ribbon">Available</span></div>
+          <div class="pcard-body">
+            <div class="pcard-title">Hindustan Gardenia</div>
+            <div class="pcard-meta">HSR Layout · 2BHK · 1,140 sqft · Hindustan Constr.</div>
+            <div class="pcard-foot"><span class="price">₹75 L</span><span class="pill idle">stable</span></div>
+          </div>
+        </div>
+        <div class="pcard">
+          <div class="pcard-img b"><span class="ribbon">Sold</span></div>
+          <div class="pcard-body">
+            <div class="pcard-title">Godrej Reflections</div>
+            <div class="pcard-meta">Bellandur · 3BHK · Godrej Properties</div>
+            <div class="pcard-foot"><span class="price">₹1.85 Cr</span><span class="pill success">closed</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ CAMPAIGNS ============ -->
+    <section class="page" id="page-campaigns">
+      <div class="crumb">Work · Campaigns</div>
+      <div class="head">
+        <div>
+          <div class="title">Campaigns</div>
+          <div class="sub">Batched outbound runs through the Campaign Conductor agent. TRAI-aware throttling.</div>
+        </div>
+        <div class="actions">
+          <button class="btn">⏸ Pause all</button>
+          <button class="btn primary" onclick="openModal('new-campaign')">+ New Campaign</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Active</div><span class="pill running">2 running</span></div>
+        <div style="padding: 0;">
+          <div style="padding: 16px 18px; border-bottom: 1px solid var(--hairline); cursor:pointer;" onclick="openDrawer('Whitefield Premium · Campaign')">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:14px;">
+              <div>
+                <div style="font-weight:600; font-size:14.5px;">Whitefield Premium 3BHK</div>
+                <div style="color:var(--ink-3); font-size:12.5px; margin-top:3px;">Targets 50 leads · Sunrise Property-outbound · script: premium-pitch-v2</div>
+              </div>
+              <span class="pill running"><span class="pulse"></span> dialing</span>
+            </div>
+            <div style="display:flex; gap:18px; margin-top:14px; align-items:center;">
+              <div style="flex:1; background: var(--surface-2); border-radius:999px; height:6px; overflow:hidden;"><div style="width:38%; height:100%; background: var(--accent);"></div></div>
+              <div style="font-size:12px; color:var(--ink-3);"><b style="color:var(--ink)">19 / 50</b> dialed · 7 connected · 3 booked · 1 DNC</div>
+            </div>
+          </div>
+          <div style="padding: 16px 18px; cursor:pointer;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:14px;">
+              <div>
+                <div style="font-weight:600; font-size:14.5px;">Bandra Re-engagement</div>
+                <div style="color:var(--ink-3); font-size:12.5px; margin-top:3px;">Targets 25 cold leads from Q4 2025 · Sunrise Property-outbound</div>
+              </div>
+              <span class="pill running"><span class="pulse"></span> dialing</span>
+            </div>
+            <div style="display:flex; gap:18px; margin-top:14px; align-items:center;">
+              <div style="flex:1; background: var(--surface-2); border-radius:999px; height:6px; overflow:hidden;"><div style="width:76%; height:100%; background: var(--warm);"></div></div>
+              <div style="font-size:12px; color:var(--ink-3);"><b style="color:var(--ink)">19 / 25</b> dialed · 11 connected · 2 booked · 0 DNC</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Drafts & completed</div></div>
+        <table class="table">
+          <thead><tr><th>Campaign</th><th>Targets</th><th>Status</th><th>Outcome</th><th>Updated</th></tr></thead>
+          <tbody>
+            <tr><td><div class="name">HSR Spring Push</div><div class="meta">script: hsr-spring-v1</div></td><td>40 leads</td><td><span class="pill idle">draft</span></td><td>—</td><td>2 days ago</td></tr>
+            <tr><td><div class="name">Premium 4BHK Cold Outreach</div><div class="meta">script: premium-cold-v3</div></td><td>30 leads</td><td><span class="pill success">completed</span></td><td>5 booked, 8 callback</td><td>1 wk ago</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ APPOINTMENTS ============ -->
+    <section class="page" id="page-appointments">
+      <div class="crumb">Work · Appointments</div>
+      <div class="head">
+        <div>
+          <div class="title">Appointments</div>
+          <div class="sub">Site visits scheduled. Appointment Guardian confirms or reschedules each one daily at 09:00 IST.</div>
+        </div>
+        <div class="actions">
+          <button class="btn">📅 Calendar view</button>
+          <button class="btn primary">+ Manual booking</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Today · 4 appointments</div><span class="pill success">3 confirmed</span></div>
+        <div>
+          <div class="apt-row" onclick="openDrawer('Mohan R. · Site visit')">
+            <div class="apt-time"><div class="apt-time-h">11:00</div><div class="apt-time-d">Today</div></div>
+            <div><div class="name">Priya Sharma</div><div class="meta">Prestige Lakeside Habitat · Whitefield · with Arjun (broker)</div></div>
+            <div><span class="pill success">confirmed</span></div>
+          </div>
+          <div class="apt-row">
+            <div class="apt-time"><div class="apt-time-h">14:00</div><div class="apt-time-d">Today</div></div>
+            <div><div class="name">Mohan R.</div><div class="meta">Prestige Lakeside Habitat · Whitefield</div></div>
+            <div><span class="pill success">confirmed</span></div>
+          </div>
+          <div class="apt-row">
+            <div class="apt-time"><div class="apt-time-h">16:30</div><div class="apt-time-d">Today</div></div>
+            <div><div class="name">Aisha S.</div><div class="meta">Sobha Dream Acres · Panathur · auto-rescheduled to Sat 11:00</div></div>
+            <div><span class="pill amber">rescheduled</span></div>
+          </div>
+          <div class="apt-row">
+            <div class="apt-time"><div class="apt-time-h">18:00</div><div class="apt-time-d">Today</div></div>
+            <div><div class="name">Karthik N.</div><div class="meta">Brigade Cornerstone · Whitefield</div></div>
+            <div><span class="pill running">awaiting reply</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Tomorrow & beyond</div></div>
+        <div>
+          <div class="apt-row"><div class="apt-time"><div class="apt-time-h">11:00</div><div class="apt-time-d">Sat</div></div><div><div class="name">Geetha Iyer</div><div class="meta">Brigade Cornerstone · Whitefield</div></div><div><span class="pill idle">scheduled</span></div></div>
+          <div class="apt-row"><div class="apt-time"><div class="apt-time-h">15:00</div><div class="apt-time-d">Sat</div></div><div><div class="name">Suresh P.</div><div class="meta">Hindustan Gardenia · HSR Layout</div></div><div><span class="pill idle">scheduled</span></div></div>
+          <div class="apt-row"><div class="apt-time"><div class="apt-time-h">10:00</div><div class="apt-time-d">Sun</div></div><div><div class="name">Deepak V.</div><div class="meta">Sobha Dream Acres · Panathur</div></div><div><span class="pill idle">scheduled</span></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ CALL LOGS ============ -->
+    <section class="page" id="page-calls">
+      <div class="crumb">Work · Call Logs</div>
+      <div class="head">
+        <div>
+          <div class="title">Call logs</div>
+          <div class="sub">Every Vapi conversation, with transcript, sentiment, and the agent that drove it.</div>
+        </div>
+        <div class="actions">
+          <button class="btn ghost">🔍 Filter</button>
+          <button class="btn">↓ Export</button>
+        </div>
+      </div>
+
+      <div class="strip">
+        <div class="stat"><span class="stat-label">Calls today</span><span class="stat-value">28</span></div>
+        <div class="stat"><span class="stat-label">Connected</span><span class="stat-value">22</span></div>
+        <div class="stat"><span class="stat-label">Avg duration</span><span class="stat-value">1m 22s</span></div>
+        <div class="stat"><span class="stat-label">Booked</span><span class="stat-value">5</span></div>
+        <div class="stat"><span class="stat-label">DNC marked</span><span class="stat-value">2</span></div>
+        <div class="stat"><span class="stat-label">Vapi minutes</span><span class="stat-value">38.4</span></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Recent calls</div></div>
+        <div>
+          <div class="call-row" onclick="openDrawer('Call · Priya Sharma · transcript')">
+            <div class="icn-circle">↗</div>
+            <div><div class="name">Priya Sharma</div><div class="meta">+91 98xxx 21567 · Sunrise Property-outbound · booked Sat 11:00</div></div>
+            <div style="font-size:12px;color:var(--ink-3);">1m 47s</div>
+            <div><span class="pill success">connected · hot</span></div>
+            <div style="font-size:12px;color:var(--ink-3);">19:23</div>
+          </div>
+          <div class="call-row" onclick="openDrawer('Call · Rahul Mehta · transcript')">
+            <div class="icn-circle">↗</div>
+            <div><div class="name">Rahul Mehta</div><div class="meta">+91 98xxx 99221 · Sunrise Property-outbound · callback scheduled Sat</div></div>
+            <div style="font-size:12px;color:var(--ink-3);">2m 11s</div>
+            <div><span class="pill warm">interested</span></div>
+            <div style="font-size:12px;color:var(--ink-3);">19:18</div>
+          </div>
+          <div class="call-row">
+            <div class="icn-circle in">↘</div>
+            <div><div class="name">Unknown caller</div><div class="meta">+91 77xxx 30022 · Sunrise Property-inbound · qualified, no info</div></div>
+            <div style="font-size:12px;color:var(--ink-3);">0m 42s</div>
+            <div><span class="pill idle">qualified</span></div>
+            <div style="font-size:12px;color:var(--ink-3);">18:55</div>
+          </div>
+          <div class="call-row">
+            <div class="icn-circle">↗</div>
+            <div><div class="name">Suresh P.</div><div class="meta">+91 99xxx 18820 · Follow-up · booked HSR Sat</div></div>
+            <div style="font-size:12px;color:var(--ink-3);">1m 31s</div>
+            <div><span class="pill success">connected · warm</span></div>
+            <div style="font-size:12px;color:var(--ink-3);">18:01</div>
+          </div>
+          <div class="call-row">
+            <div class="icn-circle miss">✗</div>
+            <div><div class="name">Vikram J.</div><div class="meta">+91 98xxx 44091 · Voicemail, auto-rescheduled tomorrow 11:00</div></div>
+            <div style="font-size:12px;color:var(--ink-3);">0m 18s</div>
+            <div><span class="pill amber">voicemail</span></div>
+            <div style="font-size:12px;color:var(--ink-3);">17:14</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ AI OPERATIONS ============ -->
+    <section class="page active" id="page-ops">
+      <div class="crumb">Intelligence · AI Operations</div>
+      <div class="head">
+        <div>
+          <div class="title">AI Operations Center</div>
+          <div class="sub">Five autonomous agents working in the background. Click any card to see what they actually did.</div>
+        </div>
+        <div class="actions">
+          <button class="btn" onclick="openCmd()"><span class="kbd">⌘K</span> Command</button>
+          <button class="btn" onclick="toast('Force run dispatched')">⚡ Force run</button>
+          <button class="btn primary" onclick="switchPage('activity')">View live activity</button>
+        </div>
+      </div>
+
+      <div class="strip">
+        <div class="stat"><span class="stat-label">System</span><span class="pill success" style="margin-top:4px; width:fit-content;"><span class="pulse"></span> Healthy</span></div>
+        <div class="stat"><span class="stat-label">Runs · 24h</span><span class="stat-value">47</span><span class="stat-delta">+12 vs yesterday</span></div>
+        <div class="stat"><span class="stat-label">Calls dialed</span><span class="stat-value">28</span><span class="stat-delta">5 booked, 2 DNC</span></div>
+        <div class="stat"><span class="stat-label">OpenAI tokens</span><span class="stat-value">142.6k</span><span class="stat-delta">≈ $1.42</span></div>
+        <div class="stat"><span class="stat-label">Vapi minutes</span><span class="stat-value">38.4</span><span class="stat-delta">avg 1m 22s</span></div>
+        <div class="stat"><span class="stat-label">Mongo writes</span><span class="stat-value">216</span><span class="stat-delta">leads · calls · logs</span></div>
+      </div>
+
+      <div class="tabs">
+        <div class="tab active">Agents</div>
+        <div class="tab" onclick="switchPage('activity')">Live activity</div>
+        <div class="tab">System map</div>
+        <div class="tab">Costs</div>
+      </div>
+
+      <div class="agents">
+
+        <div class="agent expanded" onclick="toggleExpand(this, event)">
+          <div class="agent-head">
+            <div><div class="agent-name">The Matchmaker</div><div class="agent-purpose">Pairs new clients with available properties using GPT-4o + builder KB.</div></div>
+            <div class="agent-icon">✦</div>
+          </div>
+          <div class="agent-counters">
+            <div class="counter"><div class="counter-label">Runs 24h</div><div class="counter-value">14</div></div>
+            <div class="counter"><div class="counter-label">Matches</div><div class="counter-value">23</div></div>
+            <div class="counter"><div class="counter-label">Calls</div><div class="counter-value">9</div></div>
+            <div class="counter"><div class="counter-label">KB hits</div><div class="counter-value">17</div></div>
+          </div>
+          <div class="agent-row">
+            <div><span>Trigger: <b>Event</b></span><span>Last run: <b>19:23:21</b> · 2.4s</span></div>
+            <div><span class="live"><span class="pulse"></span> Live</span><span class="pill success">success</span></div>
+          </div>
+          <div class="agent-expanded">
+            <div class="expanded-title">Last run · 3 client→property matches</div>
+            <div class="match-row" onclick="openDrawer('Matchmaker run · 19:23:21')"><div><div class="match-pair"><b>Priya Sharma</b> → <b>Prestige Lakeside Habitat · 3BHK</b></div><div class="match-meta">Whitefield · ₹1.4 Cr · Prestige Group · Ready to move</div><div class="match-rationale">Budget overlap 92%, location exact, builder reputation 88/100 (KB), timeline match (3 mo).</div><a class="vapi-link">▷ Vapi call · 1m 47s · booked site visit</a></div><div><span class="score">94</span></div></div>
+            <div class="match-row" onclick="openDrawer('Matchmaker run · 19:23:21')"><div><div class="match-pair"><b>Rahul Mehta</b> → <b>Sobha Dream Acres · 2BHK</b></div><div class="match-meta">Panathur · ₹85 L · Sobha Ltd · Possession Mar 2027</div><div class="match-rationale">Budget upper band, location adjacent, builder score 82, possession aligns with timeline.</div><a class="vapi-link">▷ Vapi call · 2m 11s · interested, callback Sat</a></div><div><span class="score">81</span></div></div>
+            <div class="match-row" onclick="openDrawer('Matchmaker run · 19:23:21')"><div><div class="match-pair"><b>Geetha Iyer</b> → <b>Brigade Cornerstone · 3BHK</b></div><div class="match-meta">Whitefield · ₹1.6 Cr · Brigade Group · Under construction</div><div class="match-rationale">Location match, builder reputation 85; price slightly above stated cap, flagged for negotiation.</div><a class="vapi-link">▷ Queued — outside TRAI hours, will dial 09:05 IST</a></div><div><span class="score warn">76</span></div></div>
+          </div>
+        </div>
+
+        <div class="agent" onclick="toggleExpand(this, event)">
+          <div class="agent-head"><div><div class="agent-name">The Follow-Up Agent</div><div class="agent-purpose">Hourly sweep for leads whose next callback time has arrived.</div></div><div class="agent-icon green">↻</div></div>
+          <div class="agent-counters"><div class="counter"><div class="counter-label">Runs 24h</div><div class="counter-value">24</div></div><div class="counter"><div class="counter-label">Picked up</div><div class="counter-value">11</div></div><div class="counter"><div class="counter-label">Calls</div><div class="counter-value">11</div></div><div class="counter"><div class="counter-label">DND skip</div><div class="counter-value">3</div></div></div>
+          <div class="agent-row"><div><span>Trigger: <b>Cron · hourly</b></span><span>Next: <b>20:00 IST</b></span></div><span class="pill success">success</span></div>
+          <div class="agent-expanded">
+            <div class="expanded-title">Last run · 3 follow-ups dialed</div>
+            <div class="match-row"><div><div class="match-pair"><b>Ananya K.</b> · "Call me back at 6pm to discuss Sobha"</div><div class="match-meta">Promised 18:00 · dialed 18:01 · answered</div></div><div><span class="score">✓</span></div></div>
+            <div class="match-row"><div><div class="match-pair"><b>Vikram J.</b> · scheduled 2nd touch</div><div class="match-meta">Voicemail · auto-rescheduled tmrw 11:00</div></div><div><span class="score warn">vm</span></div></div>
+          </div>
+        </div>
+
+        <div class="agent" onclick="toggleExpand(this, event)">
+          <div class="agent-head"><div><div class="agent-name">The Appointment Guardian</div><div class="agent-purpose">Daily 09:00 IST. Confirms or reschedules next-day site visits.</div></div><div class="agent-icon amber">◷</div></div>
+          <div class="agent-counters"><div class="counter"><div class="counter-label">Runs 7d</div><div class="counter-value">7</div></div><div class="counter"><div class="counter-label">Confirmed</div><div class="counter-value">18</div></div><div class="counter"><div class="counter-label">Resched</div><div class="counter-value">5</div></div><div class="counter"><div class="counter-label">Cancelled</div><div class="counter-value">2</div></div></div>
+          <div class="agent-row"><div><span>Trigger: <b>Cron · 09:00 IST</b></span><span>Next: <b>tmrw 09:00</b></span></div><span class="pill idle">awaiting</span></div>
+          <div class="agent-expanded">
+            <div class="expanded-title">Today's run · 4 appointments handled</div>
+            <div class="match-row"><div><div class="match-pair"><b>Mohan R.</b> · Prestige Lakeside · 14:00</div><div class="match-meta">Confirmed · address SMS sent</div></div><div><span class="score">✓</span></div></div>
+            <div class="match-row"><div><div class="match-pair"><b>Aisha S.</b> · Sobha Dream · 16:30</div><div class="match-meta">Auto-rescheduled to Sat 11:00 by Arya</div></div><div><span class="score warn">↻</span></div></div>
+          </div>
+        </div>
+
+        <div class="agent" onclick="toggleExpand(this, event)">
+          <div class="agent-head"><div><div class="agent-name">The Dead Lead Re-engager</div><div class="agent-purpose">Daily 10:00 IST. Reopens leads cold for 60+ days using prior transcript context.</div></div><div class="agent-icon violet">⟲</div></div>
+          <div class="agent-counters"><div class="counter"><div class="counter-label">Runs 7d</div><div class="counter-value">7</div></div><div class="counter"><div class="counter-label">Re-engaged</div><div class="counter-value">9</div></div><div class="counter"><div class="counter-label">Revived</div><div class="counter-value">2</div></div><div class="counter"><div class="counter-label">DNC</div><div class="counter-value">1</div></div></div>
+          <div class="agent-row"><div><span>Trigger: <b>Cron · 10:00 IST</b></span><span>Next: <b>tmrw 10:00</b></span></div><span class="pill idle">awaiting</span></div>
+        </div>
+
+        <div class="agent" onclick="toggleExpand(this, event)">
+          <div class="agent-head"><div><div class="agent-name">The Price Drop Negotiator</div><div class="agent-purpose">Event-driven. Re-pitches leads who rejected on price when price drops.</div></div><div class="agent-icon warm">₹</div></div>
+          <div class="agent-counters"><div class="counter"><div class="counter-label">Triggers 7d</div><div class="counter-value">3</div></div><div class="counter"><div class="counter-label">Notified</div><div class="counter-value">11</div></div><div class="counter"><div class="counter-label">Revived</div><div class="counter-value">4</div></div><div class="counter"><div class="counter-label">Booked</div><div class="counter-value">2</div></div></div>
+          <div class="agent-row"><div><span>Trigger: <b>Event · property PATCH</b></span><span>Last fired: <b>Mon 14:08</b></span></div><span class="pill success">success</span></div>
+        </div>
+
+        <div class="agent" onclick="toggleExpand(this, event)">
+          <div class="agent-head"><div><div class="agent-name">Voice Orchestrator (live)</div><div class="agent-purpose">Routes Vapi tool-calls mid-call. Holds shared memory across calls per lead.</div></div><div class="agent-icon">▶</div></div>
+          <div class="agent-counters"><div class="counter"><div class="counter-label">Tool calls</div><div class="counter-value">186</div></div><div class="counter"><div class="counter-label">search</div><div class="counter-value">42</div></div><div class="counter"><div class="counter-label">qualify</div><div class="counter-value">38</div></div><div class="counter"><div class="counter-label">book</div><div class="counter-value">11</div></div></div>
+          <div class="agent-row"><div><span>Trigger: <b>Live · Vapi webhook</b></span><span>Active calls: <b>1</b></span></div><span class="live"><span class="pulse"></span> 1 in-call</span></div>
+        </div>
+
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><div><div class="panel-title">System map</div><div class="panel-sub">Live data flow · edges flash when traffic moves.</div></div></div>
+        <div class="map-wrap">
+          <div class="map">
+            <div class="node live"><b>Trigger</b>Cron · Event · Vapi tool</div>
+            <div class="arrow-h live"></div>
+            <div class="node live"><b>Orchestrator</b>Semantic Kernel · per-lead memory</div>
+            <div class="arrow-h live"></div>
+            <div class="node"><b>Agent</b>Matchmaker · Follow-Up · Voice · …</div>
+          </div>
+          <div class="map" style="margin-top: 14px;">
+            <div class="node"><b>Plugin</b>OpenAI · Vapi · Mongo · KB</div>
+            <div class="arrow-h"></div>
+            <div class="node"><b>Lead update</b>state · history · transcript</div>
+            <div class="arrow-h live"></div>
+            <div class="node live"><b>Broadcast</b>SSE → Ops Center UI</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ AGENT ACTIVITY ============ -->
+    <section class="page" id="page-activity">
+      <div class="crumb">Intelligence · Agent Activity</div>
+      <div class="head">
+        <div><div class="title">Agent activity</div><div class="sub">Live event stream from all 5 agents. Click any row for the full reasoning trace.</div></div>
+        <div class="actions"><button class="btn ghost">🔍 Filter</button><button class="btn">⏸ Pause stream</button></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Live · all agents</div><span class="live"><span class="pulse"></span> streaming</span></div>
+        <div>
+          <div class="row" onclick="openDrawer('Matchmaker run · 19:23:21')"><div class="ts">19:23:21</div><div><span class="agent-tag">Matchmaker</span></div><div class="summary">Scanned 1 client (Priya S.) · <b>3 matches</b> · triggered outbound</div><div><span class="pill success">success</span></div><div class="arrow">›</div></div>
+          <div class="row"><div class="ts">19:23:35</div><div><span class="agent-tag">Voice</span></div><div class="summary">Tool-call <code>search_properties</code> · 3 hits · 8ms</div><div><span class="pill success">success</span></div><div class="arrow">›</div></div>
+          <div class="row"><div class="ts">19:25:02</div><div><span class="agent-tag violet">Qualify</span></div><div class="summary">Priya S. → <b>hot</b> · timeline 3 months · score 88</div><div><span class="pill success">success</span></div><div class="arrow">›</div></div>
+          <div class="row"><div class="ts">19:25:48</div><div><span class="agent-tag amber">Appt</span></div><div class="summary">Booked · Prestige Lakeside · Sat 11:00 · Calendar synced</div><div><span class="pill success">success</span></div><div class="arrow">›</div></div>
+          <div class="row"><div class="ts">19:00:04</div><div><span class="agent-tag green">Follow-Up</span></div><div class="summary">Hourly sweep · 11 due · 3 dialed, 5 in TRAI window, 3 DND</div><div><span class="pill success">success</span></div><div class="arrow">›</div></div>
+          <div class="row"><div class="ts">14:08:11</div><div><span class="agent-tag red">Price-Drop</span></div><div class="summary">Whitefield 3BHK ₹1.45→1.40 Cr · 4 leads notified · 2 booked</div><div><span class="pill success">success</span></div><div class="arrow">›</div></div>
+          <div class="row"><div class="ts">10:00:02</div><div><span class="agent-tag violet">Re-engage</span></div><div class="summary">3 dormant leads (60+ days) re-engaged · 1 revived</div><div><span class="pill success">success</span></div><div class="arrow">›</div></div>
+          <div class="row"><div class="ts">09:00:01</div><div><span class="agent-tag amber">Guardian</span></div><div class="summary">4 appointments next 24h · 2 confirmed, 1 rescheduled, 1 vm</div><div><span class="pill success">success</span></div><div class="arrow">›</div></div>
+          <div class="row"><div class="ts">08:42:11</div><div><span class="agent-tag red">Voice</span></div><div class="summary">Tool-call <code>mark_dnd</code> · phone +91 99xxx 11020 · "stop calling"</div><div><span class="pill failed">flagged</span></div><div class="arrow">›</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ KNOWLEDGE BASE ============ -->
+    <section class="page" id="page-kb">
+      <div class="crumb">Intelligence · Knowledge Base</div>
+      <div class="head">
+        <div><div class="title">Knowledge base</div><div class="sub">Builder facts powering the Matchmaker and Builder Refiner agents. RAG-backed.</div></div>
+        <div class="actions"><button class="btn">↑ Upload doc</button><button class="btn primary">+ Add builder</button></div>
+      </div>
+
+      <div class="strip">
+        <div class="stat"><span class="stat-label">Builders</span><span class="stat-value">17</span></div>
+        <div class="stat"><span class="stat-label">Documents</span><span class="stat-value">86</span></div>
+        <div class="stat"><span class="stat-label">RAG chunks</span><span class="stat-value">1,240</span></div>
+        <div class="stat"><span class="stat-label">KB queries 24h</span><span class="stat-value">42</span></div>
+        <div class="stat"><span class="stat-label">Coverage</span><span class="stat-value">94%</span></div>
+        <div class="stat"><span class="stat-label">Last sync</span><span class="stat-value">2h ago</span></div>
+      </div>
+
+      <div class="kb-grid">
+        <div class="kb-card" onclick="openDrawer('Prestige Group · KB')">
+          <div class="kb-builder">P</div>
+          <div style="font-weight:600; font-size:14.5px;">Prestige Group</div>
+          <div style="color:var(--ink-3); font-size:12.5px; margin-top:4px;">Bangalore · 32 active projects · 18 docs</div>
+          <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:12px;"><span>Reputation</span><b>88 / 100</b></div>
+          <div class="rep-bar"><div class="rep-fill" style="width:88%"></div></div>
+          <div style="margin-top:10px; font-size:11.5px; color:var(--ink-3);">Last queried 18 min ago · 4 calls today</div>
+        </div>
+        <div class="kb-card">
+          <div class="kb-builder">S</div>
+          <div style="font-weight:600; font-size:14.5px;">Sobha Ltd</div>
+          <div style="color:var(--ink-3); font-size:12.5px; margin-top:4px;">Bangalore · 21 active · 12 docs</div>
+          <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:12px;"><span>Reputation</span><b>82 / 100</b></div>
+          <div class="rep-bar"><div class="rep-fill" style="width:82%; background:var(--amber)"></div></div>
+          <div style="margin-top:10px; font-size:11.5px; color:var(--ink-3);">Last queried 1h ago · 2 calls today</div>
+        </div>
+        <div class="kb-card">
+          <div class="kb-builder">B</div>
+          <div style="font-weight:600; font-size:14.5px;">Brigade Group</div>
+          <div style="color:var(--ink-3); font-size:12.5px; margin-top:4px;">Bangalore · 18 active · 9 docs</div>
+          <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:12px;"><span>Reputation</span><b>85 / 100</b></div>
+          <div class="rep-bar"><div class="rep-fill" style="width:85%"></div></div>
+          <div style="margin-top:10px; font-size:11.5px; color:var(--ink-3);">Last queried 22 min ago · 3 calls today</div>
+        </div>
+        <div class="kb-card">
+          <div class="kb-builder">D</div>
+          <div style="font-weight:600; font-size:14.5px;">DLF</div>
+          <div style="color:var(--ink-3); font-size:12.5px; margin-top:4px;">Pan-India · 47 active · 22 docs</div>
+          <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:12px;"><span>Reputation</span><b>79 / 100</b></div>
+          <div class="rep-bar"><div class="rep-fill" style="width:79%; background:var(--amber)"></div></div>
+        </div>
+        <div class="kb-card">
+          <div class="kb-builder">G</div>
+          <div style="font-weight:600; font-size:14.5px;">Godrej Properties</div>
+          <div style="color:var(--ink-3); font-size:12.5px; margin-top:4px;">Pan-India · 26 active · 14 docs</div>
+          <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:12px;"><span>Reputation</span><b>87 / 100</b></div>
+          <div class="rep-bar"><div class="rep-fill" style="width:87%"></div></div>
+        </div>
+        <div class="kb-card">
+          <div class="kb-builder">H</div>
+          <div style="font-weight:600; font-size:14.5px;">Hindustan Construction</div>
+          <div style="color:var(--ink-3); font-size:12.5px; margin-top:4px;">Mumbai · 14 active · 7 docs</div>
+          <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:12px;"><span>Reputation</span><b>71 / 100</b></div>
+          <div class="rep-bar"><div class="rep-fill" style="width:71%; background:var(--amber)"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ ANALYTICS ============ -->
+    <section class="page" id="page-analytics">
+      <div class="crumb">Intelligence · Analytics</div>
+      <div class="head">
+        <div><div class="title">Analytics</div><div class="sub">How your AI employees perform across leads, calls, and conversions.</div></div>
+        <div class="actions">
+          <button class="btn ghost">7d</button>
+          <button class="btn">30d</button>
+          <button class="btn ghost">90d</button>
+          <button class="btn">↓ Export</button>
+        </div>
+      </div>
+
+      <div class="strip">
+        <div class="stat"><span class="stat-label">Lead → call</span><span class="stat-value">68%</span><span class="stat-delta">+4 pts</span></div>
+        <div class="stat"><span class="stat-label">Call → booking</span><span class="stat-value">22%</span><span class="stat-delta">+2 pts</span></div>
+        <div class="stat"><span class="stat-label">Booking → close</span><span class="stat-value">31%</span><span class="stat-delta">stable</span></div>
+        <div class="stat"><span class="stat-label">Avg response time</span><span class="stat-value">4.2 min</span><span class="stat-delta">-1.1 min</span></div>
+        <div class="stat"><span class="stat-label">Cost per lead</span><span class="stat-value">₹18.40</span><span class="stat-delta">-₹2.10</span></div>
+        <div class="stat"><span class="stat-label">Revenue inf.</span><span class="stat-value">₹4.2 Cr</span><span class="stat-delta">last 30d</span></div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 2fr 1fr; gap: 16px;">
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">Calls per agent · last 7 days</div></div>
+          <div class="chart-wrap">
+            <svg viewBox="0 0 600 200" style="width:100%; height:auto;">
+              <g stroke="var(--hairline)" stroke-width="1">
+                <line x1="40" y1="20" x2="40" y2="170"/><line x1="40" y1="170" x2="580" y2="170"/>
+                <line x1="40" y1="50" x2="580" y2="50" stroke-dasharray="2 4"/>
+                <line x1="40" y1="100" x2="580" y2="100" stroke-dasharray="2 4"/>
+                <line x1="40" y1="140" x2="580" y2="140" stroke-dasharray="2 4"/>
+              </g>
+              <polyline fill="none" stroke="#0066cc" stroke-width="2" points="60,140 140,110 220,90 300,70 380,55 460,50 540,40"/>
+              <polyline fill="none" stroke="#c2410c" stroke-width="2" points="60,150 140,130 220,135 300,115 380,100 460,108 540,90"/>
+              <polyline fill="none" stroke="#1a7c4a" stroke-width="2" points="60,160 140,158 220,150 300,148 380,142 460,140 540,135"/>
+              <g font-size="10" fill="#8e8a82" font-family="-apple-system">
+                <text x="60" y="188">Mon</text><text x="140" y="188">Tue</text><text x="220" y="188">Wed</text>
+                <text x="300" y="188">Thu</text><text x="380" y="188">Fri</text><text x="460" y="188">Sat</text><text x="540" y="188">Sun</text>
+              </g>
+            </svg>
+            <div style="display:flex; gap:18px; font-size:12px; color:var(--ink-3); margin-top:6px;">
+              <span><span style="display:inline-block; width:10px; height:2px; background:#0066cc; vertical-align:middle; margin-right:5px;"></span>Matchmaker</span>
+              <span><span style="display:inline-block; width:10px; height:2px; background:#c2410c; vertical-align:middle; margin-right:5px;"></span>Follow-Up</span>
+              <span><span style="display:inline-block; width:10px; height:2px; background:#1a7c4a; vertical-align:middle; margin-right:5px;"></span>Re-engager</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">Top performing agent</div></div>
+          <div style="padding: 24px; text-align:center;">
+            <div style="font-size: 36px; font-weight: 600; color: var(--accent); letter-spacing: -0.02em;">94%</div>
+            <div style="font-weight:600; margin-top:6px;">The Matchmaker</div>
+            <div style="color:var(--ink-3); font-size:12.5px; margin-top:4px;">Highest conversion to booked site visit</div>
+            <div style="margin-top:18px; padding-top:18px; border-top:1px solid var(--hairline); font-size:12px; color:var(--ink-3);">
+              Cost · ₹0.42 / call · 38× ROI
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SETTINGS ============ -->
+    <section class="page" id="page-settings">
+      <div class="crumb">Settings</div>
+      <div class="head">
+        <div><div class="title">Settings</div><div class="sub">Runtime configuration only. Profile and account live in your avatar menu.</div></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Agent triggers</div></div>
+        <div class="panel-body">
+          <div class="settings-row"><div><div class="lbl">Matchmaker on new client</div><div class="desc">Fire Matchmaker the moment a client is created.</div></div><div class="switch on" onclick="this.classList.toggle('on')"></div></div>
+          <div class="settings-row"><div><div class="lbl">Price-Drop on PATCH</div><div class="desc">Trigger Price-Drop agent when property price decreases.</div></div><div class="switch on" onclick="this.classList.toggle('on')"></div></div>
+          <div class="settings-row"><div><div class="lbl">Auto-call hot leads</div><div class="desc">Score ≥ 75 dials automatically inside TRAI window.</div></div><div class="switch on" onclick="this.classList.toggle('on')"></div></div>
+          <div class="settings-row"><div><div class="lbl">Reasoning summaries (gpt-4o-mini)</div><div class="desc">Generate plain-English summary for every run.</div></div><div class="switch on" onclick="this.classList.toggle('on')"></div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Compliance</div></div>
+        <div class="panel-body">
+          <div class="settings-row"><div><div class="lbl">TRAI window</div><div class="desc">No outbound calls 21:00–09:00 IST.</div></div><div style="font-size:13px; color:var(--ink-2);">09:00–21:00 IST</div></div>
+          <div class="settings-row"><div><div class="lbl">DNC enforcement</div><div class="desc">Honor mark_dnd tool calls instantly across all agents.</div></div><div class="switch on" onclick="this.classList.toggle('on')"></div></div>
+          <div class="settings-row"><div><div class="lbl">Recording retention</div><div class="desc">Vapi recordings stored in Azure Blob.</div></div><div style="font-size:13px; color:var(--ink-2);">90 days</div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Integrations</div></div>
+        <div class="panel-body">
+          <div class="settings-row"><div><div class="lbl">Vapi</div><div class="desc">3 assistants · Sunrise Property outbound / inbound / reminder</div></div><span class="pill success">connected</span></div>
+          <div class="settings-row"><div><div class="lbl">Twilio</div><div class="desc">+91 80xxx 12345 · imported into Vapi</div></div><span class="pill success">connected</span></div>
+          <div class="settings-row"><div><div class="lbl">Azure Cosmos DB</div><div class="desc">MongoDB API v4.2+ · 8 collections</div></div><span class="pill success">connected</span></div>
+          <div class="settings-row"><div><div class="lbl">Google Calendar</div><div class="desc">Site visits sync to broker calendars.</div></div><span class="pill success">connected</span></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ===================== DRAWER ===================== -->
+<div class="drawer-bg" id="drawerBg" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-head">
+    <div>
+      <h3 id="drawerTitle">Matchmaker run · 19:23:21</h3>
+      <div class="runid">run_id: 7c1f3e9b-0a23-4f8d-9c67-2a55b6d4f0e1</div>
+    </div>
+    <button class="drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+
+  <div class="drawer-section">
+    <h4>Input</h4>
+    <div class="code">{
+  "trigger": "event:client.created",
+  "client_id": "cl_8821",
+  "client": {
+    "name": "Priya Sharma",
+    "budget_range": "1.2-1.5 Cr",
+    "location_pref": "Whitefield",
+    "property_type": "3BHK"
+  }
+}</div>
+  </div>
+
+  <div class="drawer-section">
+    <h4>Reasoning steps</h4>
+    <div class="step eval"><div class="kind">Evaluation</div>Loaded 12 available properties in Whitefield. Filtered to budget range 1.2–1.5 Cr → 5 candidates.</div>
+    <div class="step tool"><div class="kind">Tool · KB</div>Queried builder KB for Prestige, Sobha, Brigade, Hindustan, DLF — retrieved reputation 88 / 82 / 85 / 71 / 79.</div>
+    <div class="step tool"><div class="kind">Tool · OpenAI gpt-4o</div>Pairing prompt with 5 candidates × client profile + KB facts. 1,842 in / 612 out tokens.</div>
+    <div class="step decision"><div class="kind">Decision</div>3 matches above score 75 — Prestige Lakeside (94), Sobha Dream Acres (81), Brigade Cornerstone (76).</div>
+    <div class="step decision"><div class="kind">Decision</div>Top match qualifies for immediate Vapi outbound (TRAI hours, hot timeline).</div>
+    <div class="step tool"><div class="kind">Tool · Vapi</div>Initiated Sunrise Property-outbound · phone +91 98xxx · context payload attached.</div>
+  </div>
+
+  <div class="drawer-section">
+    <h4>Actions</h4>
+    <div class="step tool"><div class="kind">openai_call</div>gpt-4o · 2,454 tokens · 1.4s · 200</div>
+    <div class="step tool"><div class="kind">kb_query</div>collection builders · 5 hits</div>
+    <div class="step tool"><div class="kind">vapi_call</div>Sunrise Property-outbound · vc_5f81... · 1m 47s · booked</div>
+    <div class="step tool"><div class="kind">mongo_write</div>leads (1) · property_matches (3) · agent_conversations (1) · lead_state_history (1)</div>
+  </div>
+
+  <div class="drawer-section">
+    <h4>Reasoning summary</h4>
+    <div class="step"><div class="kind">Summary · confidence 0.92</div>Matchmaker identified 3 strong candidates, prioritising Prestige Lakeside because budget alignment, location exact, and builder reputation (88) were all in the top quartile. Outbound call was triggered immediately because TRAI window was open and the lead's stated timeline (3 months) qualified as hot. The next two matches were queued as backup pitches.</div>
+  </div>
+
+  <div class="drawer-section">
+    <h4>Transcript excerpt</h4>
+    <div class="transcript-line"><b>Arya:</b> Hi Priya, this is Arya from GharSoch. I noticed you're looking for a 3BHK in Whitefield around 1.4 Cr — have you heard about Prestige Lakeside Habitat?</div>
+    <div class="transcript-line cust"><b>Priya:</b> Hi, yes I've seen it online. Is it ready to move?</div>
+    <div class="transcript-line"><b>Arya:</b> Yes, ready to move and just within your budget. Would you like to visit this Saturday around 11am?</div>
+    <div class="transcript-line cust"><b>Priya:</b> 11am Saturday works for me.</div>
+  </div>
+</aside>
+
+<!-- ===================== MODAL · NEW CLIENT ===================== -->
+<div class="modal" id="modal-new-client">
+  <div class="modal-card">
+    <div class="modal-head"><h3>New client</h3><button class="drawer-close" onclick="closeModal('new-client')">✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Full name</label><input placeholder="e.g. Priya Sharma"/></div>
+      <div class="field-row">
+        <div class="field"><label>Phone</label><input placeholder="+91 98xxx xxxxx"/></div>
+        <div class="field"><label>Email (optional)</label><input placeholder="priya@example.com"/></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Source</label><select><option>Web form</option><option>CSV upload</option><option>Manual</option><option>Referral</option></select></div>
+        <div class="field"><label>Property type</label><select><option>2BHK</option><option>3BHK</option><option>4BHK</option><option>Villa</option></select></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Budget range</label><input placeholder="1.2–1.5 Cr"/></div>
+        <div class="field"><label>Location preference</label><input placeholder="Whitefield"/></div>
+      </div>
+      <div class="field"><label>Notes</label><textarea rows="3" placeholder="Anything Arya should mention on the first call..."></textarea></div>
+      <div style="background:var(--accent-soft); padding:10px 12px; border-radius:8px; font-size:12px; color:var(--accent); margin-top:6px;">
+        ✦ The Client→Lead Converter agent will run automatically on save and may trigger an outbound call.
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="closeModal('new-client')">Cancel</button>
+      <button class="btn primary" onclick="closeModal('new-client'); toast('Client created · Converter agent dispatched')">Create & dispatch</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL · NEW PROPERTY ===================== -->
+<div class="modal" id="modal-new-property">
+  <div class="modal-card">
+    <div class="modal-head"><h3>Add property</h3><button class="drawer-close" onclick="closeModal('new-property')">✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Title</label><input placeholder="Prestige Lakeside Habitat"/></div>
+      <div class="field-row">
+        <div class="field"><label>Builder</label><input placeholder="Prestige Group"/></div>
+        <div class="field"><label>Type</label><select><option>3BHK</option><option>2BHK</option><option>Villa</option></select></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Location</label><input placeholder="Whitefield"/></div>
+        <div class="field"><label>Price (₹)</label><input placeholder="14000000"/></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Area (sqft)</label><input placeholder="1840"/></div>
+        <div class="field"><label>Status</label><select><option>Available</option><option>In negotiation</option><option>Sold</option></select></div>
+      </div>
+      <div class="field"><label>Description</label><textarea rows="3" placeholder="Key amenities, possession date, USPs..."></textarea></div>
+      <div style="background:var(--warm-soft); padding:10px 12px; border-radius:8px; font-size:12px; color:var(--warm); margin-top:6px;">
+        ✦ Matchmaker will scan all unmatched leads on save.
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="closeModal('new-property')">Cancel</button>
+      <button class="btn primary" onclick="closeModal('new-property'); toast('Property added · Matchmaker dispatched')">Add property</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL · NEW CAMPAIGN ===================== -->
+<div class="modal" id="modal-new-campaign">
+  <div class="modal-card">
+    <div class="modal-head"><h3>New campaign</h3><button class="drawer-close" onclick="closeModal('new-campaign')">✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Campaign name</label><input placeholder="Whitefield Premium 3BHK"/></div>
+      <div class="field"><label>Description</label><textarea rows="2" placeholder="Cold outreach to leads with 1.2 Cr+ budget"></textarea></div>
+      <div class="field-row">
+        <div class="field"><label>Voice assistant</label><select><option>Sunrise Property-outbound</option></select></div>
+        <div class="field"><label>Script template</label><select><option>premium-pitch-v2</option><option>cold-outreach-v1</option><option>re-engage-v3</option></select></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Start</label><input type="datetime-local" value="2026-05-08T09:00"/></div>
+        <div class="field"><label>End</label><input type="datetime-local" value="2026-05-12T21:00"/></div>
+      </div>
+      <div class="field"><label>Target leads</label><input placeholder="Filter: status=warm AND budget>=1.2Cr · 50 leads matched"/></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="closeModal('new-campaign')">Save draft</button>
+      <button class="btn primary" onclick="closeModal('new-campaign'); toast('Campaign launched · Conductor dispatched')">Launch now</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== COMMAND PALETTE ===================== -->
+<div class="cmd-overlay" id="cmd" onclick="if(event.target===this) closeCmd()">
+  <div class="cmd">
+    <input class="cmd-input" placeholder="Type a command or search..." id="cmdInput" oninput="filterCmd()" />
+    <div class="cmd-list" id="cmdList">
+      <div class="cmd-item focus" onclick="closeCmd(); switchPage('ops')"><span class="lbl">Open · AI Operations Center</span><span class="ctx">G O</span></div>
+      <div class="cmd-item" onclick="closeCmd(); openModal('new-client')"><span class="lbl">Create new client</span><span class="ctx">N C</span></div>
+      <div class="cmd-item" onclick="closeCmd(); openModal('new-property')"><span class="lbl">Add new property</span><span class="ctx">N P</span></div>
+      <div class="cmd-item" onclick="closeCmd(); openModal('new-campaign')"><span class="lbl">New campaign</span><span class="ctx">N M</span></div>
+      <div class="cmd-item" onclick="closeCmd(); toast('Force run dispatched')"><span class="lbl">⚡ Force run · Matchmaker</span><span class="ctx">F M</span></div>
+      <div class="cmd-item" onclick="closeCmd(); toast('Force run dispatched')"><span class="lbl">⚡ Force run · Follow-Up</span><span class="ctx">F F</span></div>
+      <div class="cmd-item" onclick="closeCmd(); switchPage('leads')"><span class="lbl">Go · Leads Pipeline</span><span class="ctx">G L</span></div>
+      <div class="cmd-item" onclick="closeCmd(); switchPage('properties')"><span class="lbl">Go · Properties</span><span class="ctx">G R</span></div>
+      <div class="cmd-item" onclick="closeCmd(); switchPage('campaigns')"><span class="lbl">Go · Campaigns</span><span class="ctx">G C</span></div>
+      <div class="cmd-item" onclick="closeCmd(); switchPage('appointments')"><span class="lbl">Go · Appointments</span><span class="ctx">G A</span></div>
+      <div class="cmd-item" onclick="closeCmd(); switchPage('calls')"><span class="lbl">Go · Call Logs</span><span class="ctx">G K</span></div>
+      <div class="cmd-item" onclick="closeCmd(); switchPage('kb')"><span class="lbl">Go · Knowledge Base</span><span class="ctx">G B</span></div>
+      <div class="cmd-item" onclick="closeCmd(); switchPage('analytics')"><span class="lbl">Go · Analytics</span><span class="ctx">G N</span></div>
+      <div class="cmd-item" onclick="closeCmd(); switchPage('settings')"><span class="lbl">Go · Settings</span><span class="ctx">G S</span></div>
+    </div>
+    <div class="cmd-foot"><span>↑↓ navigate · ↵ select · esc close</span><span>⌘K</span></div>
+  </div>
+</div>
+
+<!-- ===================== TOAST ===================== -->
+<div class="toast" id="toast">Saved</div>
+
+<script>
+  // Page routing
+  function switchPage(id) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + id).classList.add('active');
+    document.querySelectorAll('.nav-item[data-page]').forEach(n => n.classList.toggle('active', n.dataset.page === id));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  document.querySelectorAll('.nav-item[data-page]').forEach(n => {
+    n.addEventListener('click', () => switchPage(n.dataset.page));
+  });
+
+  // Agent expand
+  function toggleExpand(card, ev) {
+    if (ev.target.closest('.match-row, .vapi-link, .agent-row')) return;
+    document.querySelectorAll('.agent.expanded').forEach(c => { if (c !== card) c.classList.remove('expanded'); });
+    card.classList.toggle('expanded');
+  }
+
+  // Drawer
+  function openDrawer(title) {
+    document.getElementById('drawerTitle').textContent = title;
+    document.getElementById('drawer').classList.add('open');
+    document.getElementById('drawerBg').classList.add('open');
+  }
+  function closeDrawer() {
+    document.getElementById('drawer').classList.remove('open');
+    document.getElementById('drawerBg').classList.remove('open');
+  }
+
+  // Modals
+  function openModal(name) { document.getElementById('modal-' + name).classList.add('open'); }
+  function closeModal(name) { document.getElementById('modal-' + name).classList.remove('open'); }
+
+  // Command palette
+  function openCmd() { document.getElementById('cmd').classList.add('open'); setTimeout(() => document.getElementById('cmdInput').focus(), 50); }
+  function closeCmd() { document.getElementById('cmd').classList.remove('open'); document.getElementById('cmdInput').value = ''; filterCmd(); }
+  function filterCmd() {
+    const q = document.getElementById('cmdInput').value.toLowerCase();
+    document.querySelectorAll('.cmd-item').forEach(i => {
+      const t = i.querySelector('.lbl').textContent.toLowerCase();
+      i.style.display = t.includes(q) ? '' : 'none';
+    });
+  }
+
+  // Toast
+  let toastTimer;
+  function toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  // Keys
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); openCmd(); }
+    if (e.key === 'Escape') { closeDrawer(); closeCmd(); document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open')); }
+  });
+
+  // Glean toolbar (PDF export)
+  if (window.GleanBridge) {
+    window.GleanBridge.postMessage({ actionId: 'export-pdf', type: 'glean-add-menu', metadata: { label: 'Export as PDF', icon: 'export' } });
+    window.GleanBridge.onMessage('action', d => { if (d.actionId === 'export-pdf') window.print(); });
+  }
+</script>
+</body>
+</html>
