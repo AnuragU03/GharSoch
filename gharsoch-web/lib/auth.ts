@@ -78,10 +78,10 @@ export const authConfig: NextAuthConfig = {
           return true
         }
 
-        // Suspended users cannot sign in at all
-        if (existing.status === 'suspended') return false
+        // Suspended users: let them through OAuth so they get the branded /auth/suspended page.
+        // Their status='suspended' is embedded in the JWT; the page redirects them there.
 
-        // Update last login + refresh avatar
+        // Update last login + refresh avatar for all returning users
         await users.updateOne(
           { email: user.email },
           { $set: { last_login_at: new Date(), image: user.image ?? existing.image } }
@@ -90,7 +90,6 @@ export const authConfig: NextAuthConfig = {
         return true
       } catch (err) {
         console.error('[auth] signIn DB error:', err)
-        // If DB is unreachable, fail closed — do not allow login without a verified user record
         return false
       }
     },
@@ -138,6 +137,22 @@ export const authConfig: NextAuthConfig = {
      */
     authorized({ auth: session }) {
       return !!session?.user
+    },
+
+    /**
+     * redirect: post-signIn landing URL based on role and status.
+     * Status gating takes priority over role.
+     */
+    async redirect({ url, baseUrl }) {
+      // Honour an explicit callbackUrl that isn't an auth page itself
+      if (url.startsWith(baseUrl)) {
+        const path = url.slice(baseUrl.length)
+        if (path && !path.startsWith('/auth/') && !path.startsWith('/welcome')) {
+          return url
+        }
+      }
+      // Role/status routing is handled in the sign-in pages and middleware.
+      return baseUrl
     },
   },
 }
