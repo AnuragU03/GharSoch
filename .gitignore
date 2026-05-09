@@ -1,6 +1,52 @@
-*.ps1
+# ─── Secrets — NEVER commit ────────────────────────────────────────────────────
 .env
 .env.*
+!.env.example
+
+# ─── Office / confidential docs ────────────────────────────────────────────────
+*.docx
+*.xlsx
+*.pdf
 *BRD*
 *PRD*
-*.docx
+
+# ─── PowerShell local scripts ──────────────────────────────────────────────────
+*.ps1
+
+# ─── Next.js (gharsoch-web subfolder) ─────────────────────────────────────────
+gharsoch-web/.next/
+gharsoch-web/.next-stale*/
+gharsoch-web/out/
+gharsoch-web/build/
+gharsoch-web/standalone/
+
+# ─── Node modules ──────────────────────────────────────────────────────────────
+node_modules/
+gharsoch-web/node_modules/
+
+# ─── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+*.log.*
+gharsoch-web/*.log
+gharsoch-web/.gate*.log
+gharsoch-web/.tmp-*.log
+gharsoch-web/gate-*.log
+gharsoch-web/phase*.log
+gharsoch-web/dev_output.txt
+gharsoch-web/dev_stderr.txt
+gharsoch-web/build_output.txt
+
+# ─── Azure Functions build output ─────────────────────────────────────────────
+gharsoch-web/azure/functions/local.settings.json
+gharsoch-web/azure/functions/dist/
+gharsoch-web/azure/functions/node_modules/
+gharsoch-web/azure/functions/.azurite/
+gharsoch-web/azure/functions/func_output*.txt
+
+# ─── Misc ──────────────────────────────────────────────────────────────────────
+.DS_Store
+*.pem
+*.tsbuildinfo
+gharsoch-web/next-env.d.ts
+.idea/
+.vscode/

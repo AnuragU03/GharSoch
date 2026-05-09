@@ -1,64 +1,66 @@
-# Dependencies
-/node_modules
-/.pnp
+# ─── Dependencies ──────────────────────────────────────────────────────────────
+node_modules/
+.pnp
 .pnp.js
 .yarn/install-state.gz
 
-# Testing
-/coverage
-
-# Next.js
-/.next/
+# ─── Next.js build output ──────────────────────────────────────────────────────
+.next/
+.next-stale*/
 /out/
+/build/
+standalone/
 
-# Production
-/build
+# ─── Testing / Coverage ────────────────────────────────────────────────────────
+/coverage/
 
-# Misc
-.DS_Store
-*.pem
+# ─── Environment files — NEVER commit secrets ──────────────────────────────────
+.env
+.env.*
+!.env.example
 
-# Debug
+# ─── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+*.log.*
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.gate4a-build.log
+gate-*.log
+gate-*-dev.out.log
+gate-*-dev.err.log
+gate-*-verify-dev.out.log
+gate-*-verify-dev.err.log
+.gate*.log
+.tmp-*.log
+phase*.log
+dev_output.txt
+dev_stderr.txt
+build_output.txt
 
-# Local env files
-.env*.local
-.env
-
-# Vercel
-.vercel
-
-# TypeScript
+# ─── Misc ──────────────────────────────────────────────────────────────────────
+.DS_Store
+*.pem
 *.tsbuildinfo
 next-env.d.ts
 
-# IDE
+# ─── IDE ───────────────────────────────────────────────────────────────────────
 .idea/
 .vscode/
 
-# Scripts
+# ─── PowerShell scripts (local dev only) ───────────────────────────────────────
 *.ps1
 
-# Azure Functions
+# ─── Vercel ────────────────────────────────────────────────────────────────────
+.vercel
+
+# ─── Azure Functions ───────────────────────────────────────────────────────────
 azure/functions/local.settings.json
 azure/functions/dist/
 azure/functions/node_modules/
 azure/functions/.azurite/
 azure/functions/func_output*.txt
 
-
-# Phase documentation and test files (local development only)
+# ─── Legacy phase docs (local development only) ────────────────────────────────
 PHASE_7_IMPLEMENTATION.md
 PHASE_7_QUICK_START.md
 PHASE_7_TESTING.ts
-
-dev_output.txt
-dev_stderr.txt
-gate-*-dev.out.log
-gate-*-dev.err.log
-gate-*-verify-dev.out.log
-gate-*-verify-dev.err.log
-build_output.txt
