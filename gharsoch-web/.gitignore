@@ -54,3 +54,11 @@ azure/functions/func_output*.txt
 PHASE_7_IMPLEMENTATION.md
 PHASE_7_QUICK_START.md
 PHASE_7_TESTING.ts
+
+dev_output.txt
+dev_stderr.txt
+gate-*-dev.out.log
+gate-*-dev.err.log
+gate-*-verify-dev.out.log
+gate-*-verify-dev.err.log
+build_output.txt

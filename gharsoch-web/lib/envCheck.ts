@@ -53,49 +53,82 @@ export function checkEnv(): EnvCheckResult {
   return { ok: missing.length === 0, missing: [...missing] }
 }
 
-export function validateEnv(): void {
+export interface ValidateEnvOpts {
+  checkAdminBootstrap?: boolean
+}
+
+export async function validateEnv(opts?: ValidateEnvOpts): Promise<void> {
   if (!shouldValidateNow()) return
 
+  // 1. Synchronous env var check (fast, no I/O)
   const result = checkEnv()
-  if (result.ok) return
+  if (!result.ok) {
+    throw new Error(
+      `Missing required environment variables: ${result.missing.join(', ')}. ` +
+        `Set them in your environment (or .env.local) before running the server.`
+    )
+  }
 
-  // Do not leak any secret values; only list missing keys.
-  throw new Error(
-    `Missing required environment variables: ${result.missing.join(', ')}. ` +
-      `Set them in your environment (or .env.local) before running the server.`
-  )
+  // 2. Optional async admin bootstrap check (requires DB)
+  if (opts?.checkAdminBootstrap) {
+    try {
+      await validateAdminBootstrap()
+    } catch (err) {
+      if (process.env.NODE_ENV === 'production') throw err
+      // In dev, warn but do not crash the server — dev env may not have DB yet
+      console.warn(
+        '[BOOT] Admin bootstrap check failed (non-fatal in dev):',
+        err instanceof Error ? err.message : err
+      )
+    }
+  }
 }
 
 /**
- * validateAdminBootstrap — async, run once at server startup.
+ * validateAdminBootstrap — async, called once per cold boot via validateEnv().
  *
- * If BOOTSTRAP_ADMIN_EMAIL is not set AND no admin user exists in the DB,
- * we throw a hard error to prevent a production lockout scenario.
+ * Two distinct cases:
+ *   A) BOOTSTRAP_ADMIN_EMAIL is SET → log info if no admin yet (first-boot notice)
+ *   B) BOOTSTRAP_ADMIN_EMAIL is UNSET AND no admin exists → throw (lockout prevention)
+ *   C) admin exists in DB → silent (all good regardless of env var)
  *
- * NOTE: cron-triggered agent runs are NOT blocked by this check —
- * they use x-cron-secret and do not depend on the admin user existing.
+ * Mongo errors are caught and warned — a Cosmos blip at boot must not crash the server.
+ *
+ * NOTE: cron-triggered agent runs are NOT affected by this check —
+ * they use x-cron-secret and operate on system behalf, independent of any user.
  */
 export async function validateAdminBootstrap(): Promise<void> {
   if (!shouldValidateNow()) return
 
-  const bootstrapEmail = process.env.BOOTSTRAP_ADMIN_EMAIL
-  if (bootstrapEmail && bootstrapEmail.trim().length > 0) return // all good
-
-  // No BOOTSTRAP_ADMIN_EMAIL set — check if an admin already exists in DB
   try {
     const { getCollection } = await import('@/lib/mongodb')
     const users = await getCollection('users')
-    const adminExists = await users.findOne({ role: 'admin', status: 'active' })
-    if (adminExists) return // existing admin, no lockout risk
+    const adminCount = await users.countDocuments({ role: 'admin', status: 'active' })
 
+    if (adminCount >= 1) return // admin exists — all good, silent
+
+    // No active admin found
+    const bootstrapEmail = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim()
+
+    if (bootstrapEmail) {
+      // Email is configured — first sign-in will auto-promote; this is expected on fresh deploy
+      console.log(
+        `[BOOT] No admin user yet. First sign-in by ${bootstrapEmail} will be auto-promoted to admin.`
+      )
+      return
+    }
+
+    // No email AND no admin — production lockout risk
     throw new Error(
       'BOOTSTRAP_ADMIN_EMAIL must be set when no admin user exists. ' +
-        'Add BOOTSTRAP_ADMIN_EMAIL=your@email.com to your .env file. ' +
+        'Set to anurag.ugargol@gm.com in your .env or Azure App Service config. ' +
         'This prevents admin lockout on first deploy.'
     )
   } catch (err) {
+    // Re-throw our own lockout error — it must propagate
     if (err instanceof Error && err.message.includes('BOOTSTRAP_ADMIN_EMAIL')) throw err
-    // DB connection error during bootstrap check — warn but don't block startup
-    console.warn('[envCheck] Could not verify admin bootstrap state:', err)
+    // Any other error (Cosmos unreachable, timeout, etc.) — warn and continue
+    console.warn('[BOOT] Could not verify admin bootstrap state (DB may be unreachable):', err)
   }
 }
+

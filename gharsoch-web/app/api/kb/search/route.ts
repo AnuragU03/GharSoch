@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authMiddleware } from '@/lib/auth'
 import { searchDemoListings } from '@/lib/demoKb'
 
-export const POST = authMiddleware(async (req: NextRequest) => {
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const query = typeof body?.query === 'string' ? body.query : ''
@@ -25,5 +24,5 @@ export const POST = authMiddleware(async (req: NextRequest) => {
       { status: 500 }
     )
   }
-})
+}
 

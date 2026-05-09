@@ -13,12 +13,12 @@ export const metadata: Metadata = {
   description: 'Built with Next.js, React, and Tailwind CSS',
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  validateEnv()
+  await validateEnv({ checkAdminBootstrap: true })
   const isPaidUser = process.env.IS_PAID_USER === 'true'
   return (
     <html lang="en" suppressHydrationWarning>
