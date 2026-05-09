@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCollection } from '@/lib/mongodb'
+import { authErrorResponse, requireSession } from '@/lib/auth'
 
 export async function GET() {
   try {
+    await requireSession()
+    // Phase 11.5: filter follow-ups by session.user.brokerage_id.
     const leads = await getCollection('leads')
 
     const now = new Date()
@@ -24,6 +27,8 @@ export async function GET() {
 
     return NextResponse.json({ success: true, follow_ups: followUps, total: followUps.length })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/FollowUps] Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }

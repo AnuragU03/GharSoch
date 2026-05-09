@@ -7,9 +7,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAgentConfig } from '@/lib/agentRegistry'
 import { runAgent } from '@/lib/runAgent'
+import { authErrorResponse, requireRole } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: verify call and lead belong to session.user.brokerage_id.
     const body = await request.json()
     const { call_data, lead_state } = body
 
@@ -122,6 +125,8 @@ Check for conflicts and inconsistencies. Return validation results.`
       run_id: runId,
     })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Call-State-Validator] Error:', error)
     const errorMsg = error instanceof Error ? error.message : 'Server error'
 

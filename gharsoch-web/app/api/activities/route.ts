@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getCollection } from '@/lib/mongodb'
+import { authErrorResponse, requireSession } from '@/lib/auth'
 
 export async function GET() {
   try {
+    await requireSession()
+    // Phase 11.5: filter activities by session.user.brokerage_id.
     const [leads, calls, appointments, campaigns] = await Promise.all([
       getCollection('leads'),
       getCollection('calls'),
@@ -53,6 +56,8 @@ export async function GET() {
 
     return NextResponse.json({ success: true, activities: activities.slice(0, 30) })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Activities] Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }

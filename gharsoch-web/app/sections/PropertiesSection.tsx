@@ -7,6 +7,7 @@ import { Filter, Grid2X2, Plus } from 'lucide-react'
 import { NewPropertyModal } from '@/components/modals/NewPropertyModal'
 import { PropertyCard } from '@/components/PropertyCard'
 import type { PropertyStatusFilter, SerializedProperty } from '@/lib/services/propertyService'
+import { useUserRole } from '@/lib/auth/useUserRole'
 
 const FILTERS: Array<{ label: string; value: '' | PropertyStatusFilter }> = [
   { label: 'All', value: '' },
@@ -25,6 +26,8 @@ export function PropertiesSection({
   const currentStatus = (searchParams.get('status') || '') as '' | PropertyStatusFilter
   const [newOpen, setNewOpen] = useState(false)
   const [editingProperty, setEditingProperty] = useState<SerializedProperty | null>(null)
+  const { role } = useUserRole()
+  const canAdd = role === 'admin' || role === 'tech'
 
   const counts = useMemo(() => {
     const active = initialProperties.filter((property) => property.status !== 'sold').length
@@ -60,9 +63,11 @@ export function PropertiesSection({
           <button className="btn" type="button">
             <Grid2X2 size={13} strokeWidth={1.8} /> Grid
           </button>
-          <button className="btn primary" type="button" onClick={() => setNewOpen(true)}>
-            <Plus size={13} strokeWidth={1.8} /> Add Property
-          </button>
+          {canAdd && (
+            <button className="btn primary" type="button" onClick={() => setNewOpen(true)}>
+              <Plus size={13} strokeWidth={1.8} /> Add Property
+            </button>
+          )}
         </div>
       </div>
 

@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCollection } from '@/lib/mongodb'
 import { ObjectId } from 'mongodb'
 import { DEFAULT_APPOINTMENT } from '@/models/Appointment'
+import { authErrorResponse, requireRole, requireSession } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
+    await requireSession()
+    // Phase 11.5: filter appointments by session.user.brokerage_id via linked lead/property.
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const leadId = searchParams.get('leadId')
@@ -39,6 +42,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, appointments: items, total })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Appointments] GET Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }
@@ -46,6 +51,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: verify lead/property belongs to session.user.brokerage_id.
     const body = await request.json()
     const appointments = await getCollection('appointments')
 
@@ -64,6 +71,8 @@ export async function POST(request: NextRequest) {
       appointment: { ...appointment, _id: result.insertedId },
     })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Appointments] POST Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }
@@ -71,6 +80,8 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: verify appointment belongs to session.user.brokerage_id.
     const body = await request.json()
     const { _id, ...updates } = body
 
@@ -92,6 +103,8 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true, modified: result.modifiedCount })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Appointments] PUT Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }
@@ -99,6 +112,8 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: verify appointment belongs to session.user.brokerage_id.
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
     const all = searchParams.get('all')
@@ -131,6 +146,8 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Appointments] DELETE Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }

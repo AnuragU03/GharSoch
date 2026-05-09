@@ -3,9 +3,12 @@ import { getCollection } from '@/lib/mongodb'
 import { ObjectId } from 'mongodb'
 import { SEED_BUILDERS } from '@/models/Builder'
 import type { Builder } from '@/models/Builder'
+import { authErrorResponse, requireRole, requireSession } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
+    await requireSession()
+    // Phase 11.5: decide if builders are global or brokerage-scoped.
     const { searchParams } = new URL(request.url)
     const city = searchParams.get('city')
 
@@ -34,6 +37,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, builders: items, total: items.length })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Builders] GET Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }
@@ -41,6 +46,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: stamp custom builders with session.user.brokerage_id if KB becomes tenant-scoped.
     const body = await request.json()
     const { name, city, notable_projects, description, website } = body
 
@@ -62,6 +69,8 @@ export async function POST(request: NextRequest) {
     const result = await builders.insertOne(builder as any)
     return NextResponse.json({ success: true, builder: { ...builder, _id: result.insertedId } })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Builders] POST Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }
@@ -69,6 +78,8 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: verify custom builder belongs to session.user.brokerage_id if tenant-scoped.
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
     const all = searchParams.get('all')
@@ -98,6 +109,8 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Builders] DELETE Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }

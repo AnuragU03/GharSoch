@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import getClientProfileModel from '@/models/clientProfile'
 import { handleGet, handlePost, handlePut, handleDelete } from '@/lib/crudHandler'
+import { authErrorResponse, requireRole, requireSession } from '@/lib/auth'
 
 async function getCol() { return getClientProfileModel() }
 
 export async function GET(req: NextRequest) {
-  try { return handleGet(await getCol(), req) } catch (e: any) { return NextResponse.json({ success: false, error: e?.message }, { status: 500 }) }
+  try { await requireSession(); return handleGet(await getCol(), req) } catch (e: any) { const authResponse = authErrorResponse(e); if (authResponse) return authResponse; return NextResponse.json({ success: false, error: e?.message }, { status: 500 }) }
 }
 export async function POST(req: NextRequest) {
-  try { return handlePost(await getCol(), req) } catch (e: any) { return NextResponse.json({ success: false, error: e?.message }, { status: 500 }) }
+  try { await requireRole(['admin', 'tech']); /* Phase 11.5: filter archived client profiles by session.user.brokerage_id. */ return handlePost(await getCol(), req) } catch (e: any) { const authResponse = authErrorResponse(e); if (authResponse) return authResponse; return NextResponse.json({ success: false, error: e?.message }, { status: 500 }) }
 }
 export async function PUT(req: NextRequest) {
-  try { return handlePut(await getCol(), req) } catch (e: any) { return NextResponse.json({ success: false, error: e?.message }, { status: 500 }) }
+  try { await requireRole(['admin', 'tech']); /* Phase 11.5: filter archived client profiles by session.user.brokerage_id. */ return handlePut(await getCol(), req) } catch (e: any) { const authResponse = authErrorResponse(e); if (authResponse) return authResponse; return NextResponse.json({ success: false, error: e?.message }, { status: 500 }) }
 }
 export async function DELETE(req: NextRequest) {
-  try { return handleDelete(await getCol(), req) } catch (e: any) { return NextResponse.json({ success: false, error: e?.message }, { status: 500 }) }
+  try { await requireRole(['admin', 'tech']); /* Phase 11.5: filter archived client profiles by session.user.brokerage_id. */ return handleDelete(await getCol(), req) } catch (e: any) { const authResponse = authErrorResponse(e); if (authResponse) return authResponse; return NextResponse.json({ success: false, error: e?.message }, { status: 500 }) }
 }

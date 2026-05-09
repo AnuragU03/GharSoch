@@ -6,6 +6,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { NewClientModal } from '@/components/modals/NewClientModal';
 import { Client } from '@/models/Client';
+import { useUserRole } from '@/lib/auth/useUserRole';
 
 const STATUS_FILTERS = [
   { label: 'All', value: '' },
@@ -20,6 +21,8 @@ export function ClientsSection({ initialClients }: { initialClients: Client[] })
   const searchParams = useSearchParams();
   const currentStatus = searchParams.get('status') || '';
   const [modalOpen, setModalOpen] = useState(false);
+  const { role } = useUserRole();
+  const canAdd = role === 'admin' || role === 'tech';
 
   const handleStatusFilter = (status: string) => {
     const params = new URLSearchParams(searchParams);
@@ -48,12 +51,14 @@ export function ClientsSection({ initialClients }: { initialClients: Client[] })
           <h1 className="text-2xl font-semibold text-ink">Clients</h1>
           <p className="text-sm text-ink-3">Raw prospects before qualification</p>
         </div>
-        <button
-          onClick={() => setModalOpen(true)}
-          className="inline-flex h-9 items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-medium text-white shadow hover:bg-accent/90 transition-colors"
-        >
-          + New Client
-        </button>
+        {canAdd && (
+          <button
+            onClick={() => setModalOpen(true)}
+            className="inline-flex h-9 items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-medium text-white shadow hover:bg-accent/90 transition-colors"
+          >
+            + New Client
+          </button>
+        )}
       </div>
 
       <div className="flex items-center gap-2 border-b border-hairline px-6 py-3">

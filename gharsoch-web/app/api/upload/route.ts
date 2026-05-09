@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { uploadToBlob } from '@/lib/azureBlob';
+import { authErrorResponse, requireRole } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: associate uploaded assets with session.user.brokerage_id.
     // Graceful failure if environment variables are not set (as requested)
     if (!process.env.AZURE_STORAGE_CONNECTION_STRING) {
       return NextResponse.json(
@@ -56,6 +59,8 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('File upload error:', error);
     return NextResponse.json(
       {

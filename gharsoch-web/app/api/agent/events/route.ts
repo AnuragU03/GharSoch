@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 
 import type { AgentExecutionTrace } from '@/lib/agentLogger'
 import { getCollection } from '@/lib/mongodb'
+import { requireSession } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -181,9 +182,10 @@ function buildDeltaEvents(runs: AgentExecutionTrace[], seen: Map<string, KnownRu
 }
 
 export async function GET(req: NextRequest) {
-  const authHeader = req.headers.get('x-cron-secret')
-  const isAdmin = true
-  if (!isAdmin && authHeader !== process.env.CRON_SECRET) {
+  try {
+    await requireSession()
+    // Phase 11.5: filter agent event streams by session.user.brokerage_id.
+  } catch {
     return new Response('Unauthorized', { status: 401 })
   }
 

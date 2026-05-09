@@ -1,6 +1,6 @@
 export type Role = 'admin' | 'tech' | 'broker'
 
-const ALL_NAV = [
+const BASE_NAV = [
   '/',
   '/leads',
   '/clients',
@@ -14,6 +14,8 @@ const ALL_NAV = [
   '/analytics',
   '/settings',
 ]
+
+const ADMIN_NAV = [...BASE_NAV, '/settings/users']
 
 // Brokers cannot see AI Ops or Agent Activity (full reasoning traces, system internals)
 const BROKER_NAV = [
@@ -41,7 +43,7 @@ export const VISIBILITY: Record<
   }
 > = {
   admin: {
-    nav: ALL_NAV,
+    nav: ADMIN_NAV,
     canForceRun: true,
     canViewReasoning: true,
     canViewCosts: true,
@@ -49,7 +51,7 @@ export const VISIBILITY: Record<
     canManageSettings: true,
   },
   tech: {
-    nav: ALL_NAV,
+    nav: BASE_NAV,
     canForceRun: true,
     canViewReasoning: true,
     canViewCosts: true,

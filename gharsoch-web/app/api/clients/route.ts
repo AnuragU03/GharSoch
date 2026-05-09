@@ -2,15 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { clientService } from '@/lib/services/clientService'
 import { runClientLeadConverter } from '@/lib/agents/clientLeadConverter'
 import { runMatchmakerForLead } from '@/lib/agents/matchmaker'
+import { authErrorResponse, requireRole, requireSession } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
 // GET /api/clients — list all clients
 export async function GET(request: NextRequest) {
   try {
-    // Phase 11 Auth check placeholder
-    const isAdmin = true;
-    if (!isAdmin) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    await requireSession()
+    // Phase 11.5: filter clients by session.user.brokerage_id when multi-tenant lands.
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status') || undefined
@@ -19,6 +19,8 @@ export async function GET(request: NextRequest) {
     const data = await clientService.listClients({ status, source })
     return NextResponse.json({ success: true, clients: data })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Clients] GET Error:', error)
     return NextResponse.json({ success: false, error: 'Failed to fetch clients' }, { status: 500 })
   }
@@ -27,9 +29,8 @@ export async function GET(request: NextRequest) {
 // POST /api/clients — add a new client
 export async function POST(request: NextRequest) {
   try {
-    // Phase 11 Auth check placeholder
-    const isAdmin = true;
-    if (!isAdmin) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: stamp new clients with session.user.brokerage_id.
 
     const body = await request.json()
     const { name, phone, email, budget_range, location_pref, property_type, source, notes } = body
@@ -77,6 +78,8 @@ export async function POST(request: NextRequest) {
       message: 'Client created. Conversion in progress.',
     })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Clients] POST Error:', error)
     return NextResponse.json({ success: false, error: 'Failed to add client' }, { status: 500 })
   }

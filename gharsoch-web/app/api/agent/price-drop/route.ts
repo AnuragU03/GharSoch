@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { runPriceDropNegotiator } from '@/lib/agents/priceDropNegotiator'
+import { authErrorResponse, requireRole } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,9 +11,17 @@ export const dynamic = 'force-dynamic'
  * Fired in-process from property updates when a price decreases.
  */
 export async function POST(request: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET
-  if (cronSecret && request.headers.get('x-cron-secret') !== cronSecret) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+  try {
+    const cronSecret = process.env.CRON_SECRET
+    const isCronAuthorized = Boolean(cronSecret && request.headers.get('x-cron-secret') === cronSecret)
+    if (!isCronAuthorized) {
+      await requireRole(['admin', 'tech'])
+    }
+    // Phase 11.5: attach actor brokerage_id to price-drop runs when multi-tenant lands.
+  } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
+    throw error
   }
 
   let body: Record<string, any> = {}

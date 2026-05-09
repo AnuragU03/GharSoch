@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { authErrorResponse, requireRole } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,6 +25,8 @@ async function readJson(response: Response) {
 
 export async function POST(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: attach actor brokerage_id to manual agent runs when multi-tenant lands.
     const { agent_id } = await request.json()
 
     if (agent_id === 'price-drop') {
@@ -76,6 +79,8 @@ export async function POST(request: NextRequest) {
       { status: response.ok ? 200 : response.status }
     )
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Agent/Run] POST Error:', error)
     return NextResponse.json(
       { success: false, message: 'Failed to manually run agent.' },

@@ -3,9 +3,12 @@ import { getCollection } from '@/lib/mongodb'
 import { ObjectId } from 'mongodb'
 import { DEFAULT_LEAD } from '@/models/Lead'
 import type { Lead } from '@/models/Lead'
+import { authErrorResponse, requireRole, requireSession } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
+    await requireSession()
+    // Phase 11.5: filter leads by session.user.brokerage_id when multi-tenant lands.
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const qualification = searchParams.get('qualification')
@@ -38,6 +41,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, leads: items, total })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Leads] GET Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }
@@ -45,6 +50,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: stamp lead with session.user.brokerage_id.
     const body = await request.json()
     const leads = await getCollection('leads')
 
@@ -63,6 +70,8 @@ export async function POST(request: NextRequest) {
       lead: { ...lead, _id: result.insertedId },
     })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Leads] POST Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }
@@ -70,6 +79,8 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: verify lead belongs to session.user.brokerage_id.
     const body = await request.json()
     const { _id, ...updates } = body
 
@@ -95,6 +106,8 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true, modified: result.modifiedCount })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Leads] PUT Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }
@@ -102,6 +115,8 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: verify deleted leads belong to session.user.brokerage_id.
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
     const all = searchParams.get('all')
@@ -134,6 +149,8 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Leads] DELETE Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }

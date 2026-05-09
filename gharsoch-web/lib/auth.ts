@@ -21,6 +21,7 @@
  */
 
 import NextAuth, { type NextAuthConfig } from 'next-auth'
+import { NextResponse } from 'next/server'
 import Google from 'next-auth/providers/google'
 import { getCollection } from '@/lib/mongodb'
 import { getDefaultLanding } from '@/lib/auth/roles'
@@ -167,6 +168,24 @@ export class AuthError extends Error {
     super(message)
     this.name = 'AuthError'
   }
+}
+
+export function authErrorResponse(error: unknown) {
+  if (!(error instanceof AuthError)) {
+    return null
+  }
+
+  if (error.status === 401) {
+    return NextResponse.json(
+      { error: 'Unauthorized', code: 'NO_SESSION' },
+      { status: 401 }
+    )
+  }
+
+  return NextResponse.json(
+    { error: 'Forbidden', code: 'INSUFFICIENT_ROLE' },
+    { status: 403 }
+  )
 }
 
 /**

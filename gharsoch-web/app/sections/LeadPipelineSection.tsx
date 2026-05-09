@@ -21,6 +21,7 @@ import { NewClientModal } from '@/components/modals/NewClientModal'
 import { toast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import type { LeadPipelineStage, LeadPipelineStats, SerializedLead } from '@/lib/services/leadService'
+import { useUserRole } from '@/lib/auth/useUserRole'
 
 const STAGES: Array<{ id: LeadPipelineStage; label: string }> = [
   { id: 'new', label: 'New' },
@@ -47,6 +48,8 @@ export function LeadPipelineSection({
   const [activeLead, setActiveLead] = useState<SerializedLead | null>(null)
   const [openLeadId, setOpenLeadId] = useState<string | null>(null)
   const [newLeadOpen, setNewLeadOpen] = useState(false)
+  const { role } = useUserRole()
+  const canAdd = role === 'admin' || role === 'tech'
   const [isPending, startTransition] = useTransition()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
@@ -148,9 +151,11 @@ export function LeadPipelineSection({
           <button className="btn" type="button" onClick={() => void handleExport()}>
             <Download size={13} strokeWidth={1.8} /> Export CSV
           </button>
-          <button className="btn primary" type="button" onClick={() => setNewLeadOpen(true)}>
-            <Plus size={13} strokeWidth={1.8} /> New Lead
-          </button>
+          {canAdd && (
+            <button className="btn primary" type="button" onClick={() => setNewLeadOpen(true)}>
+              <Plus size={13} strokeWidth={1.8} /> New Lead
+            </button>
+          )}
         </div>
       </div>
 

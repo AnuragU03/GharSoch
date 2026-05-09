@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 
+import { requireRole } from '@/lib/auth'
 import { propertyService } from '@/lib/services/propertyService'
 
 function parseAmenities(value: FormDataEntryValue | null) {
@@ -11,6 +12,8 @@ function parseAmenities(value: FormDataEntryValue | null) {
 }
 
 export async function savePropertyAction(formData: FormData) {
+  await requireRole(['admin', 'tech'])
+  // Phase 11.5: stamp and filter properties by session.user.brokerage_id.
   const id = String(formData.get('id') || '')
   const payload = {
     title: String(formData.get('title') || '').trim(),

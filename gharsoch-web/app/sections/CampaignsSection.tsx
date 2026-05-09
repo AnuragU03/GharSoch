@@ -9,6 +9,7 @@ import { NewCampaignModal } from '@/components/modals/NewCampaignModal'
 import { Pill } from '@/components/Pill'
 import { toast } from '@/lib/toast'
 import type { SerializedCampaign } from '@/lib/services/campaignService'
+import { useUserRole } from '@/lib/auth/useUserRole'
 
 function progressPercent(campaign: SerializedCampaign) {
   const total = campaign.target_lead_ids?.length || 0
@@ -42,6 +43,8 @@ export function CampaignsSection({
 }) {
   const [newOpen, setNewOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const { role } = useUserRole()
+  const canAdd = role === 'admin' || role === 'tech'
 
   const activeCount = useMemo(
     () => activeCampaigns.filter((campaign) => ['active', 'queued'].includes(String(campaign.status || '').toLowerCase())).length,
@@ -83,9 +86,11 @@ export function CampaignsSection({
           >
             <Pause size={13} strokeWidth={1.8} /> Pause all
           </button>
-          <button className="btn primary" type="button" onClick={() => setNewOpen(true)}>
-            <Plus size={13} strokeWidth={1.8} /> New Campaign
-          </button>
+          {canAdd && (
+            <button className="btn primary" type="button" onClick={() => setNewOpen(true)}>
+              <Plus size={13} strokeWidth={1.8} /> New Campaign
+            </button>
+          )}
         </div>
       </div>
 

@@ -18,6 +18,7 @@ import type {
   CallsPerAgentPoint,
   TopPerformingAgent,
 } from '@/lib/services/analyticsService'
+import { useUserRole } from '@/lib/auth/useUserRole'
 
 /* ── helpers ────────────────────────────────────────────── */
 
@@ -165,6 +166,7 @@ export function AnalyticsSection({
   callsPerAgent: CallsPerAgentPoint[]
   topAgent: TopPerformingAgent | null
 }) {
+  const { can } = useUserRole()
   const hasData = funnel.clients > 0 || funnel.converted_to_lead > 0
   const hasChartData = callsPerAgent.some(
     p => p.matchmaker > 0 || p.follow_up > 0 || p.re_engager > 0 || p.guardian > 0 || p.voice > 0
@@ -176,8 +178,12 @@ export function AnalyticsSection({
     { label: 'Call → Booking', value: pct(kpis.call_to_booking_pct), delta: 'Connected to booked' },
     { label: 'Booking → Close', value: pct(kpis.booking_to_close_pct), delta: 'Visit to conversion' },
     { label: 'Avg response', value: kpis.avg_response_min > 0 ? `${kpis.avg_response_min}m` : '—', delta: 'Lead → first call' },
-    { label: 'Cost / lead', value: kpis.cost_per_lead_inr > 0 ? inr(kpis.cost_per_lead_inr) : '—', delta: 'Phase 12: real billing' },
-    { label: 'Revenue (est)', value: kpis.revenue_inferred_inr > 0 ? inr(kpis.revenue_inferred_inr) : '—', delta: 'Inferred from bookings' },
+    can.viewCosts
+      ? { label: 'Cost / lead', value: kpis.cost_per_lead_inr > 0 ? inr(kpis.cost_per_lead_inr) : '—', delta: 'Phase 12: real billing' }
+      : { empty: true },
+    can.viewCosts
+      ? { label: 'Revenue (est)', value: kpis.revenue_inferred_inr > 0 ? inr(kpis.revenue_inferred_inr) : '—', delta: 'Inferred from bookings' }
+      : { empty: true },
   ]
 
   return (

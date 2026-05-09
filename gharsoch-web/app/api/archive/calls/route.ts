@@ -6,9 +6,12 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { callArchiveService } from '@/lib/callArchiveService'
+import { authErrorResponse, requireRole, requireSession } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
+    await requireSession()
+    // Phase 11.5: filter call archives by session.user.brokerage_id.
     const { searchParams } = new URL(request.url)
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100)
 
@@ -22,6 +25,8 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Archive/Calls] GET Error:', error)
     const errorMsg = error instanceof Error ? error.message : 'Server error'
     return NextResponse.json(
@@ -33,6 +38,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: archive only calls visible to session.user.brokerage_id.
     const body = await request.json()
     const { start_date, end_date, filters } = body
 
@@ -68,6 +75,8 @@ export async function POST(request: NextRequest) {
       data: archive,
     })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Archive/Calls] POST Error:', error)
     const errorMsg = error instanceof Error ? error.message : 'Server error'
     return NextResponse.json(

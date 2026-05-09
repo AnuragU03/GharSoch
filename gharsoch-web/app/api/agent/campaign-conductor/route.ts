@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { runCampaignConductor } from '@/lib/agents/campaignConductor'
+import { authErrorResponse, requireRole } from '@/lib/auth'
 
 const CRON_SECRET = process.env.CRON_SECRET ?? ''
 
@@ -15,8 +16,16 @@ export async function POST(req: NextRequest) {
     req.headers.get('authorization')?.replace('Bearer ', '') ??
     ''
 
-  if (!CRON_SECRET || incomingSecret !== CRON_SECRET) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    const isCronAuthorized = Boolean(CRON_SECRET && incomingSecret === CRON_SECRET)
+    if (!isCronAuthorized) {
+      await requireRole(['admin', 'tech'])
+    }
+    // Phase 11.5: verify campaign belongs to session.user.brokerage_id when manually triggered.
+  } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
+    throw error
   }
 
   try {

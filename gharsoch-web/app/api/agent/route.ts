@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAgentConfig } from '@/lib/agentRegistry'
 import { runAgent } from '@/lib/runAgent'
+import { authErrorResponse, requireRole } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: attach actor brokerage_id to manual agent runs when multi-tenant lands.
     const body = await request.json()
     const { message, agent_id, context, user_id, session_id } = body
 
@@ -95,6 +98,8 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Agent] Error:', error)
     const errorMsg = error instanceof Error ? error.message : 'Server error'
     const runId = (error as any)?.runId

@@ -3,9 +3,12 @@ import { getCollection } from '@/lib/mongodb'
 import { ObjectId } from 'mongodb'
 import { DEFAULT_PROPERTY } from '@/models/Property'
 import SEED_PROPERTIES from '@/data/propertySeed'
+import { authErrorResponse, requireRole, requireSession } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
+    await requireSession()
+    // Phase 11.5: filter properties by session.user.brokerage_id when multi-tenant lands.
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type')
     const builder = searchParams.get('builder')
@@ -19,6 +22,11 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '100')
     const skip = parseInt(searchParams.get('skip') || '0')
     const seed = searchParams.get('seed')
+
+    if (seed === 'true') {
+      await requireRole(['admin', 'tech'])
+      // Phase 11.5: seed only the current session.user.brokerage_id inventory.
+    }
 
     const properties = await getCollection('properties')
     
@@ -77,6 +85,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, properties: items, total })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Properties] GET Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }
@@ -84,6 +94,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: stamp property with session.user.brokerage_id.
     const body = await request.json()
     const properties = await getCollection('properties')
 
@@ -104,6 +116,8 @@ export async function POST(request: NextRequest) {
       property: { ...property, _id: result.insertedId },
     })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Properties] POST Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }
@@ -111,6 +125,8 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: verify property belongs to session.user.brokerage_id.
     const body = await request.json()
     const { _id, ...updates } = body
 
@@ -134,6 +150,8 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true, modified: result.modifiedCount })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Properties] PUT Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }
@@ -141,6 +159,8 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: verify deleted properties belong to session.user.brokerage_id.
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
     const all = searchParams.get('all')
@@ -173,6 +193,8 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Properties] DELETE Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }

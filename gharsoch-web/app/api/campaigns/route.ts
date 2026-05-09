@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCollection } from '@/lib/mongodb'
 import { ObjectId } from 'mongodb'
 import { DEFAULT_CAMPAIGN } from '@/models/Campaign'
+import { authErrorResponse, requireRole, requireSession } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
+    await requireSession()
+    // Phase 11.5: filter campaigns by session.user.brokerage_id when multi-tenant lands.
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const search = searchParams.get('search')
@@ -29,6 +32,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, campaigns: items, total })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Campaigns] GET Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }
@@ -36,6 +41,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: stamp campaign with session.user.brokerage_id.
     const body = await request.json()
     const campaigns = await getCollection('campaigns')
 
@@ -55,6 +62,8 @@ export async function POST(request: NextRequest) {
       campaign: { ...campaign, _id: result.insertedId },
     })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Campaigns] POST Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }
@@ -62,6 +71,8 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: verify campaign belongs to session.user.brokerage_id.
     const body = await request.json()
     const { _id, ...updates } = body
 
@@ -84,6 +95,8 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true, modified: result.modifiedCount })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Campaigns] PUT Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }
@@ -91,6 +104,8 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: verify deleted campaigns belong to session.user.brokerage_id.
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
     const all = searchParams.get('all')
@@ -123,6 +138,8 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Campaigns] DELETE Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }

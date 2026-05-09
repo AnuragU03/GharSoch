@@ -6,9 +6,12 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { agentLogger } from '@/lib/agentLogger'
+import { authErrorResponse, requireSession } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
+    await requireSession()
+    // Phase 11.5: filter execution history by session.user.brokerage_id.
     const { searchParams } = new URL(request.url)
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100)
     const skip = parseInt(searchParams.get('skip') || '0')
@@ -84,6 +87,8 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Follow-ups/ExecutionHistory] Error:', error)
     const errorMsg = error instanceof Error ? error.message : 'Server error'
     return NextResponse.json(

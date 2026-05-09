@@ -7,11 +7,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAgentConfig } from '@/lib/agentRegistry'
 import { runAgent } from '@/lib/runAgent'
+import { authErrorResponse, requireRole } from '@/lib/auth'
 
 const AGENT_ID = '69e8f70b2234567890abcde1'
 
 export async function POST(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: verify property matches belong to session.user.brokerage_id.
     const body = await request.json()
     const { property_matches, matches, client_profile, builder_preferences } = body
 
@@ -177,6 +180,8 @@ Return a JSON object with:
 
     return NextResponse.json(output)
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/BuilderRefiner] Error:', error)
     const errorMsg = error instanceof Error ? error.message : 'Server error'
 

@@ -2,9 +2,12 @@
 
 import { revalidatePath } from 'next/cache'
 
+import { requireRole } from '@/lib/auth'
 import { appointmentService } from '@/lib/services/appointmentService'
 
 export async function createAppointmentAction(formData: FormData) {
+  await requireRole(['admin', 'tech'])
+  // Phase 11.5: filter/select leads and properties by session.user.brokerage_id.
   const lead_id = String(formData.get('lead_id') || '').trim()
   const property_id = String(formData.get('property_id') || '').trim()
   const scheduled_at = String(formData.get('scheduled_at') || '').trim()

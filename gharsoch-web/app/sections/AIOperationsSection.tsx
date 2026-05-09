@@ -12,6 +12,7 @@ import type {
   AgentDashboardSummary,
   HealthStripData,
 } from '@/lib/services/agentDashboardService'
+import { useUserRole } from '@/lib/auth/useUserRole'
 
 type AgentConfig = {
   id: string
@@ -130,6 +131,7 @@ export function AIOperationsSection({
   const [activeTab, setActiveTab] = useState<'agents' | 'activity' | 'system' | 'costs'>('agents')
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const { can } = useUserRole()
 
   const summaryMap = new Map(summaries.map((summary) => [summary.agent_id, summary]))
   const runMap = new Map<string, AgentDashboardRun>()
@@ -173,7 +175,9 @@ export function AIOperationsSection({
           </div>
           <div className="actions">
             <button className="btn ghost" type="button">Refresh</button>
-            <button className="btn" type="button">Force run</button>
+            {can.forceRun && (
+              <button className="btn" type="button">Force run</button>
+            )}
           </div>
         </div>
 

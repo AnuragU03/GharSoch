@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAvailability, createEvent } from '@/lib/googleCalendar';
+import { authErrorResponse, requireRole } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: verify scheduled event belongs to session.user.brokerage_id.
     const body = await request.json();
     const { action, timeMin, timeMax, summary, description, startTime, endTime, attendees } = body;
 
@@ -25,6 +28,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });
 
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('Scheduler API Error:', error);
     return NextResponse.json(
       { success: false, error: (error as Error).message },

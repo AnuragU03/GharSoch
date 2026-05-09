@@ -1,12 +1,15 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 
+import { forceRunAgent } from '@/app/actions/agents'
 import { LivePulse } from '@/components/LivePulse'
 import { Pill, type PillVariant } from '@/components/Pill'
 import { useAgentEventStream } from '@/lib/hooks/useAgentEventStream'
+import { useUserRole } from '@/lib/auth/useUserRole'
+import { toast } from '@/lib/toast'
 import type {
   AgentDashboardRun,
   AgentDashboardSummary,
@@ -188,7 +191,9 @@ export function AgentCard({
   liveLabel?: string
 }) {
   const router = useRouter()
+  const { can } = useUserRole()
   const [expanded, setExpanded] = useState(false)
+  const [isForceRunPending, startForceRunTransition] = useTransition()
   const [liveStatus, setLiveStatus] = useState<string | null>(null)
   const [pulseActive, setPulseActive] = useState(false)
   const [voiceCounters, setVoiceCounters] = useState<VoiceCounterState>(() => normalizeVoiceCounters(summary))
@@ -335,6 +340,21 @@ export function AgentCard({
       ]
     : counters
 
+  const handleForceRun = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+    startForceRunTransition(() => {
+      void forceRunAgent(id)
+        .then(() => {
+          toast.success(`${name} force run queued`)
+          router.refresh()
+        })
+        .catch((error) => {
+          console.error('[AI OPS] Force run failed:', error)
+          toast.error('Could not force run agent')
+        })
+    })
+  }
+
   return (
     <article
       className={`agent${expanded ? ' expanded' : ''}`}
@@ -371,10 +391,20 @@ export function AgentCard({
             Trigger: <b>{triggerLabel}</b>
           </span>
           <span>
-            Last run: <b>{formatTimestamp(lastRunAt)}</b>
+            Last triggered: <b>{formatTimestamp(lastRunAt)}</b>
           </span>
         </div>
         <div>
+          {can.forceRun ? (
+            <button
+              type="button"
+              className="btn sm ghost"
+              disabled={isForceRunPending}
+              onClick={handleForceRun}
+            >
+              {isForceRunPending ? 'Running...' : 'Force Run'}
+            </button>
+          ) : null}
           <Pill variant={pillVariant}>{pillLabel}</Pill>
           {(liveLabel || liveStatus || pulseActive || voiceLiveCount > 0) ? (
             <span className="live">

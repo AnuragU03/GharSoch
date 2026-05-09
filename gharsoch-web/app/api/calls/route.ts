@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCollection } from '@/lib/mongodb'
 import { ObjectId } from 'mongodb'
 import { DEFAULT_CALL } from '@/models/Call'
+import { authErrorResponse, requireRole, requireSession } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
+    await requireSession()
+    // Phase 11.5: filter calls by session.user.brokerage_id through linked leads.
     const { searchParams } = new URL(request.url)
     const direction = searchParams.get('direction')
     const disposition = searchParams.get('disposition')
@@ -36,6 +39,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, calls: items, total })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Calls] GET Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }
@@ -43,6 +48,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: stamp calls with session.user.brokerage_id or verify linked lead ownership.
     const body = await request.json()
     const calls = await getCollection('calls')
 
@@ -61,6 +68,8 @@ export async function POST(request: NextRequest) {
       call: { ...call, _id: result.insertedId },
     })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Calls] POST Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }
@@ -68,6 +77,8 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: verify call belongs to session.user.brokerage_id.
     const body = await request.json()
     const { _id, ...updates } = body
 
@@ -87,6 +98,8 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true, modified: result.modifiedCount })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Calls] PUT Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }
@@ -94,6 +107,8 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: verify deleted calls belong to session.user.brokerage_id.
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
     const all = searchParams.get('all')
@@ -126,6 +141,8 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Calls] DELETE Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }

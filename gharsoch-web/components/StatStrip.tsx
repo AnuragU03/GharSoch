@@ -1,9 +1,10 @@
 import type { HealthStripData } from '@/lib/services/agentDashboardService'
 
 type StatCell = {
-  label: string
-  value: string
+  label?: string
+  value?: string
   delta?: string
+  empty?: boolean
 }
 
 function formatNumber(value: number) {
@@ -32,13 +33,18 @@ export function StatStrip({
 
   return (
     <div className="strip">
-      {resolvedCells.map((cell) => (
-        <div className="stat" key={cell.label}>
-          <div className="stat-label">{cell.label}</div>
-          <div className="stat-value">{cell.value}</div>
-          {cell.delta ? <div className="stat-delta">{cell.delta}</div> : null}
-        </div>
-      ))}
+      {resolvedCells.map((cell, index) => {
+        if (cell.empty) {
+          return <div className="stat" key={`empty-${index}`} style={{ visibility: 'hidden' }} />
+        }
+        return (
+          <div className="stat" key={cell.label || index}>
+            <div className="stat-label">{cell.label}</div>
+            <div className="stat-value">{cell.value}</div>
+            {cell.delta ? <div className="stat-delta">{cell.delta}</div> : null}
+          </div>
+        )
+      })}
     </div>
   )
 }

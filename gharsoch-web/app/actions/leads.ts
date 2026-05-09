@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 
+import { requireRole, requireSession } from '@/lib/auth'
 import { leadService, type LeadPipelineStage } from '@/lib/services/leadService'
 
 function escapeCsv(value: unknown) {
@@ -10,12 +11,16 @@ function escapeCsv(value: unknown) {
 }
 
 export async function moveLeadToStageAction(leadId: string, newStage: LeadPipelineStage) {
+  await requireRole(['admin', 'tech'])
+  // Phase 11.5: verify lead belongs to session.user.brokerage_id.
   await leadService.moveToStage(leadId, newStage)
   revalidatePath('/leads')
   return { success: true }
 }
 
 export async function exportLeadsCsvAction() {
+  await requireSession()
+  // Phase 11.5: export only leads visible to session.user.brokerage_id.
   const leads = await leadService.listAll()
   const headers = ['Name', 'Phone', 'Email', 'Status', 'Interest', 'Budget', 'Location', 'Property Type', 'Created']
   const rows = leads.map((lead) => [

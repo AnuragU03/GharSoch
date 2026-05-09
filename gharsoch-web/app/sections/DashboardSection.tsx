@@ -8,6 +8,7 @@ import { NewClientModal } from '@/components/modals/NewClientModal'
 import { Pill, type PillVariant } from '@/components/Pill'
 import { RunDetailDrawer } from '@/components/RunDetailDrawer'
 import { StatStrip } from '@/components/StatStrip'
+import { useUserRole } from '@/lib/auth/useUserRole'
 import { toast } from '@/lib/toast'
 import type { AgentDashboardRun } from '@/lib/services/agentDashboardService'
 import type { DashboardData, DashboardLead } from '@/lib/services/dashboardService'
@@ -79,6 +80,8 @@ export function DashboardSection({ data }: { data: DashboardData }) {
   const [newLeadOpen, setNewLeadOpen] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [selectedRun, setSelectedRun] = useState<AgentDashboardRun | null>(null)
+  const { role } = useUserRole()
+  const canAdd = role === 'admin' || role === 'tech'
 
   const statCells = [
     { label: 'Calls', value: String(data.today.calls_made), delta: delta(data.today.calls_made, data.yesterday.calls_made) },
@@ -97,16 +100,20 @@ export function DashboardSection({ data }: { data: DashboardData }) {
             <p className="sub">Your AI workforce, at a glance.</p>
           </div>
           <div className="actions">
-            <button type="button" className="btn" onClick={() => setNewLeadOpen(true)}>
-              + New Lead
-            </button>
-            <button
-              type="button"
-              className="btn primary"
-              onClick={() => toast('Force run all agents coming in Phase 12')}
-            >
-              Force run all agents
-            </button>
+            {canAdd && (
+              <button type="button" className="btn" onClick={() => setNewLeadOpen(true)}>
+                + New Lead
+              </button>
+            )}
+            {canAdd && (
+              <button
+                type="button"
+                className="btn primary"
+                onClick={() => toast('Force run all agents coming in Phase 12')}
+              >
+                Force run all agents
+              </button>
+            )}
           </div>
         </div>
 

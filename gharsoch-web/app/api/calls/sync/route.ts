@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCollection } from '@/lib/mongodb'
 import OpenAI from 'openai'
+import { authErrorResponse, requireRole } from '@/lib/auth'
 
 const VAPI_API_KEY = process.env.VAPI_API_KEY || ''
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' })
@@ -79,6 +80,8 @@ function buildTranscriptFromMessages(messages: any[]): string {
  */
 export async function POST(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: sync only calls visible to session.user.brokerage_id.
     let body: any = {}
     try { body = await request.json() } catch {}
 
@@ -303,6 +306,8 @@ export async function POST(request: NextRequest) {
       results,
     })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[CallSync] Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }

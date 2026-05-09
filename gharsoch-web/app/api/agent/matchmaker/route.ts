@@ -1,18 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCollection } from '@/lib/mongodb'
 import OpenAI from 'openai'
+import { authErrorResponse, requireRole } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
+    const cronSecret = process.env.CRON_SECRET
+    const authHeader = request.headers.get('authorization')
+    const isCronAuthorized = Boolean(cronSecret && authHeader === `Bearer ${cronSecret}`)
+    if (!isCronAuthorized) {
+      await requireRole(['admin', 'tech'])
+    }
+    // Phase 11.5: filter matchmaker candidate leads/properties by session.user.brokerage_id.
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     })
-    const authHeader = request.headers.get('authorization')
-    const cronSecret = process.env.CRON_SECRET
 
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    if (cronSecret && authHeader && authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -165,6 +171,8 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Agent/Matchmaker] Error:', error)
     return NextResponse.json(
       { success: false, error: 'Failed to execute AI matchmaker' },

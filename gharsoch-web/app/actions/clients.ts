@@ -1,10 +1,15 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
+
+import { requireRole } from '@/lib/auth';
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
 export async function createClientAction(formData: FormData) {
+  await requireRole(['admin', 'tech']);
+  // Phase 11.5: stamp and filter clients by session.user.brokerage_id.
   const name = formData.get('name') as string;
   const phone = formData.get('phone') as string;
   const email = formData.get('email') as string | null;
@@ -32,7 +37,7 @@ export async function createClientAction(formData: FormData) {
   try {
     const res = await fetch(`${BASE_URL}/api/clients`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Cookie: cookies().toString() },
       body: JSON.stringify(payload),
     });
 

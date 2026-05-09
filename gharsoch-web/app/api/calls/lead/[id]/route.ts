@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCollection } from '@/lib/mongodb'
+import { authErrorResponse, requireSession } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,6 +9,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    await requireSession()
+    // Phase 11.5: verify lead belongs to session.user.brokerage_id.
     const leadId = params.id
     
     if (!leadId) {
@@ -27,6 +30,8 @@ export async function GET(
       data: calls
     })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Calls/Lead] GET Error:', error)
     return NextResponse.json(
       { success: false, error: 'Failed to fetch call history' },

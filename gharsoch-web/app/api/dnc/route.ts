@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCollection } from '@/lib/mongodb'
 import { ObjectId } from 'mongodb'
+import { authErrorResponse, requireRole, requireSession } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
+    await requireSession()
+    // Phase 11.5: filter DNC rows by session.user.brokerage_id through linked leads.
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search')
 
@@ -23,6 +26,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, dnc: dncList, total: dncList.length })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/DNC] GET Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }
@@ -30,6 +35,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: only mark DNC for leads in session.user.brokerage_id.
     const { phone, reason } = await request.json()
 
     if (!phone) {
@@ -77,6 +84,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, message: `${phone} added to DNC` })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/DNC] POST Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }
@@ -84,6 +93,8 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: only remove DNC for leads in session.user.brokerage_id.
     const { searchParams } = new URL(request.url)
     const phone = searchParams.get('phone')
     const all = searchParams.get('all')
@@ -122,6 +133,8 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true, message: `${phone} removed from DNC` })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/DNC] DELETE Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }

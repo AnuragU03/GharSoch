@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import type { AgentAction, ReasoningStep } from '@/lib/agentLogger'
 import type { AgentDashboardRun } from '@/lib/services/agentDashboardService'
+import { useUserRole } from '@/lib/auth/useUserRole'
 
 function classifyStep(stepType: string) {
   const normalized = stepType.toLowerCase()
@@ -86,6 +87,46 @@ function confidenceVariant(confidence: number): PillVariant {
   return 'failed'
 }
 
+function sanitizeRunData(value: unknown, canViewCosts: boolean): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeRunData(item, canViewCosts))
+  }
+
+  if (!value || typeof value !== 'object') {
+    return value
+  }
+
+  const redacted: Record<string, unknown> = {}
+  for (const [key, nestedValue] of Object.entries(value as Record<string, unknown>)) {
+    const normalizedKey = key.toLowerCase()
+
+    if (
+      normalizedKey.includes('reasoning') ||
+      normalizedKey === 'actions' ||
+      normalizedKey.includes('kb_query') ||
+      normalizedKey.includes('kb_results')
+    ) {
+      redacted[key] = '[available to admins]'
+      continue
+    }
+
+    if (
+      !canViewCosts &&
+      (normalizedKey.includes('cost') ||
+        normalizedKey.includes('token') ||
+        normalizedKey.includes('usage') ||
+        normalizedKey.includes('billing'))
+    ) {
+      redacted[key] = '[available to admins]'
+      continue
+    }
+
+    redacted[key] = sanitizeRunData(nestedValue, canViewCosts)
+  }
+
+  return redacted
+}
+
 function RunDetailSkeleton() {
   return (
     <div>
@@ -148,15 +189,18 @@ function RunDetailBody({ run }: { run: AgentDashboardRun | null }) {
 
   const transcriptLines = extractTranscriptLines(run)
   const showVoiceCallReportTranscript = isVoiceCallReportRun(run) && transcriptLines.length > 0
+  const { can } = useUserRole()
+  const sanitizedInput = sanitizeRunData(run.input_data || {}, can.viewCosts)
+  const sanitizedOutput = sanitizeRunData(run.output_data || {}, can.viewCosts)
 
   return (
     <div className="drawer">
       <div className="drawer-section">
         <h4>Input</h4>
-        <pre className="code">{JSON.stringify(run.input_data || {}, null, 2)}</pre>
+        <pre className="code">{JSON.stringify(sanitizedInput, null, 2)}</pre>
       </div>
 
-      {showVoiceCallReportTranscript ? (
+      {can.viewReasoning && showVoiceCallReportTranscript ? (
         <div className="drawer-section">
           <h4>Call transcript</h4>
           {transcriptLines.map((line, index) => {
@@ -170,64 +214,75 @@ function RunDetailBody({ run }: { run: AgentDashboardRun | null }) {
         </div>
       ) : null}
 
-      <div className="drawer-section">
-        <h4>Reasoning steps</h4>
-        {run.reasoning_steps.length > 0 ? (
-          run.reasoning_steps.map((step: ReasoningStep, index) => (
-            <div className={`step ${classifyStep(step.step_type)}`} key={`${step.timestamp}-${index}`}>
-              <div className="kind">{step.step_type}</div>
-              <div>{step.content}</div>
-            </div>
-          ))
-        ) : (
-          <div className="step eval">
-            <div className="kind">evaluation</div>
-            No reasoning steps were recorded for this run.
+      {can.viewReasoning ? (
+        <>
+          <div className="drawer-section">
+            <h4>Reasoning steps</h4>
+            {run.reasoning_steps.length > 0 ? (
+              run.reasoning_steps.map((step: ReasoningStep, index) => (
+                <div className={`step ${classifyStep(step.step_type)}`} key={`${step.timestamp}-${index}`}>
+                  <div className="kind">{step.step_type}</div>
+                  <div>{step.content}</div>
+                </div>
+              ))
+            ) : (
+              <div className="step eval">
+                <div className="kind">evaluation</div>
+                No reasoning steps were recorded for this run.
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      <div className="drawer-section">
-        <h4>Actions</h4>
-        {run.actions.length > 0 ? (
-          run.actions.map((action, index) => {
-            const kind = normalizeActionKind(action)
-            return (
-              <div className="step tool" key={`${action.timestamp}-${index}`}>
-                <div className="kind">{kind}</div>
-                <div>{action.description}</div>
-                {kind === 'kb_query' && action.parameters && (
-                  <div className="mt-2 text-xs">
-                    <div className="mb-1">
-                      <span className="inline-flex items-center rounded-full bg-surface-3 px-2 py-0.5 font-mono text-[10px]">{action.parameters.collection || 'KB'}</span>
-                      <span className="ml-2 text-ink-3">Hits: {action.result?.hit_count ?? 0}</span>
-                    </div>
-                    <pre className="mb-2 max-h-20 overflow-auto rounded bg-surface-2 p-2 text-[10px] text-ink-2">{JSON.stringify(action.parameters.filter || action.parameters.query || {}, null, 2)}</pre>
-                    {action.result?.results_preview && Array.isArray(action.result.results_preview) && action.result.results_preview.length > 0 && (
-                      <table className="w-full text-[11px]">
-                        <tbody>
-                          {action.result.results_preview.map((preview: any, i: number) => (
-                            <tr key={i} className="border-t border-hairline">
-                              <td className="py-1 text-ink-2 truncate max-w-[120px]">{preview.name}</td>
-                              <td className="py-1 text-right text-ink-3 w-16">{preview.score}</td>
-                              <td className="py-1 w-12"><div className="h-1 bg-surface-3 rounded overflow-hidden"><div className="h-full bg-ink" style={{ width: `${preview.score || 0}%` }} /></div></td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+          <div className="drawer-section">
+            <h4>Actions</h4>
+            {run.actions.length > 0 ? (
+              run.actions.map((action, index) => {
+                const kind = normalizeActionKind(action)
+                return (
+                  <div className="step tool" key={`${action.timestamp}-${index}`}>
+                    <div className="kind">{kind}</div>
+                    <div>{action.description}</div>
+                    {kind === 'kb_query' && action.parameters && (
+                      <div className="mt-2 text-xs">
+                        <div className="mb-1">
+                          <span className="inline-flex items-center rounded-full bg-surface-3 px-2 py-0.5 font-mono text-[10px]">{action.parameters.collection || 'KB'}</span>
+                          <span className="ml-2 text-ink-3">Hits: {action.result?.hit_count ?? 0}</span>
+                        </div>
+                        <pre className="mb-2 max-h-20 overflow-auto rounded bg-surface-2 p-2 text-[10px] text-ink-2">{JSON.stringify(action.parameters.filter || action.parameters.query || {}, null, 2)}</pre>
+                        {action.result?.results_preview && Array.isArray(action.result.results_preview) && action.result.results_preview.length > 0 && (
+                          <table className="w-full text-[11px]">
+                            <tbody>
+                              {action.result.results_preview.map((preview: any, i: number) => (
+                                <tr key={i} className="border-t border-hairline">
+                                  <td className="py-1 text-ink-2 truncate max-w-[120px]">{preview.name}</td>
+                                  <td className="py-1 text-right text-ink-3 w-16">{preview.score}</td>
+                                  <td className="py-1 w-12"><div className="h-1 bg-surface-3 rounded overflow-hidden"><div className="h-full bg-ink" style={{ width: `${preview.score || 0}%` }} /></div></td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
+                )
+              })
+            ) : (
+              <div className="step tool">
+                <div className="kind">mongo_write</div>
+                No tracked actions were recorded for this run.
               </div>
-            )
-          })
-        ) : (
-          <div className="step tool">
-            <div className="kind">mongo_write</div>
-            No tracked actions were recorded for this run.
+            )}
           </div>
-        )}
-      </div>
+        </>
+      ) : (
+        <div className="drawer-section">
+          <h4>Reasoning Trace</h4>
+          <div className="bg-surface-2 text-ink-3 p-3 rounded text-sm">
+            Reasoning trace available to admins
+          </div>
+        </div>
+      )}
 
       <div className="drawer-section">
         <h4>Reasoning summary</h4>
@@ -236,10 +291,10 @@ function RunDetailBody({ run }: { run: AgentDashboardRun | null }) {
 
       <div className="drawer-section">
         <h4>Output</h4>
-        <pre className="code">{JSON.stringify(run.output_data || {}, null, 2)}</pre>
+        <pre className="code">{JSON.stringify(sanitizedOutput, null, 2)}</pre>
       </div>
 
-      {transcriptLines.length > 0 && !showVoiceCallReportTranscript ? (
+      {can.viewReasoning && transcriptLines.length > 0 && !showVoiceCallReportTranscript ? (
         <div className="drawer-section">
           <h4>Transcript excerpt</h4>
           {transcriptLines.map((line, index) => {

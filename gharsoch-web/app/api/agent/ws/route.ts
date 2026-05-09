@@ -6,6 +6,7 @@
 
 import { NextRequest } from 'next/server'
 import { executionEventBroadcaster, AgentExecutionEvent } from '@/lib/agentExecutionEventBroadcaster'
+import { requireSession } from '@/lib/auth'
 
 /**
  * WebSocket upgrade handler for real-time agent monitoring
@@ -15,6 +16,13 @@ import { executionEventBroadcaster, AgentExecutionEvent } from '@/lib/agentExecu
  *   ws://localhost:3000/api/agent/ws?agent_id=123abc
  */
 export async function GET(request: NextRequest) {
+  try {
+    await requireSession()
+    // Phase 11.5: filter websocket/SSE events by session.user.brokerage_id.
+  } catch {
+    return new Response('Unauthorized', { status: 401 })
+  }
+
   const { searchParams } = new URL(request.url)
   const runId = searchParams.get('run_id')
   const agentId = searchParams.get('agent_id')

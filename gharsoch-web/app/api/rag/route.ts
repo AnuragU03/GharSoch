@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { authErrorResponse, requireRole, requireSession } from '@/lib/auth';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || 'mock-key',
@@ -13,8 +14,14 @@ const MOCK_DOCUMENTS = [
 
 export async function POST(request: NextRequest) {
   try {
-    // If it's a JSON request with just ragId, it's a GET request for documents (because frontend uses POST for getDocuments)
     const contentType = request.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      await requireSession()
+    } else {
+      await requireRole(['admin', 'tech'])
+    }
+    // Phase 11.5: scope RAG documents/vector stores to session.user.brokerage_id.
+    // If it's a JSON request with just ragId, it's a GET request for documents (because frontend uses POST for getDocuments)
     
     if (contentType.includes('application/json')) {
       const { ragId } = await request.json();
@@ -81,6 +88,8 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('RAG POST Error:', error);
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
   }
@@ -88,6 +97,8 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: verify RAG documents belong to session.user.brokerage_id.
     const { ragId, documentNames } = await request.json();
 
     if (!process.env.OPENAI_API_KEY) {
@@ -105,12 +116,16 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true, deletedCount: documentNames.length, ragId });
 
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 }
 
 export async function PATCH(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: verify crawled KB source belongs to session.user.brokerage_id.
     const { ragId, url } = await request.json();
     
     return NextResponse.json({ 
@@ -120,6 +135,8 @@ export async function PATCH(request: NextRequest) {
       ragId 
     });
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 }

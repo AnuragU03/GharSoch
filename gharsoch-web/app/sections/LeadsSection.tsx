@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { HiOutlinePlus, HiOutlineMagnifyingGlass, HiOutlineUser, HiOutlineArrowDownTray, HiChevronDown } from 'react-icons/hi2'
 import { FiTrash2, FiPhoneCall, FiEdit } from 'react-icons/fi'
 import { downloadExcel, downloadCSV } from '@/lib/download'
+import { useUserRole } from '@/lib/auth/useUserRole'
 
 const CITIES = ['Ahmedabad', 'Bangalore', 'Mumbai', 'Delhi', 'Chennai'] as const
 
@@ -45,6 +46,8 @@ export default function LeadsSection() {
   const [callingId, setCallingId] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [form, setForm] = useState({ name: '', phone: '', email: '', source: '', budget_range: '', location_pref: '', property_type: '', notes: '', timeline: '', place: '', next_follow_up_date: '', followup_reason: '' })
+  const { role } = useUserRole()
+  const canAdd = role === 'admin' || role === 'tech'
 
   const fetchLeads = useCallback(async () => {
     setLoading(true)
@@ -223,10 +226,11 @@ export default function LeadsSection() {
           <Button variant="outline" size="sm" className="gap-1.5" onClick={handleDownloadExcel} disabled={leads.length === 0}>
             <HiOutlineArrowDownTray className="w-3.5 h-3.5" /> Excel
           </Button>
-          <Dialog open={showAdd} onOpenChange={(open) => { setShowAdd(open); if (!open) setEditingId(null); }}>
-            <DialogTrigger asChild><Button size="sm" className="gap-1.5" onClick={handleOpenAdd}><HiOutlinePlus className="w-4 h-4" /> Add Lead</Button></DialogTrigger>
-            <DialogContent className="max-w-lg">
-              <DialogHeader><DialogTitle>{editingId ? 'Edit Lead' : 'Add New Lead'}</DialogTitle></DialogHeader>
+          {canAdd && (
+            <Dialog open={showAdd} onOpenChange={(open) => { setShowAdd(open); if (!open) setEditingId(null); }}>
+              <DialogTrigger asChild><Button size="sm" className="gap-1.5" onClick={handleOpenAdd}><HiOutlinePlus className="w-4 h-4" /> Add Lead</Button></DialogTrigger>
+              <DialogContent className="max-w-lg">
+                <DialogHeader><DialogTitle>{editingId ? 'Edit Lead' : 'Add New Lead'}</DialogTitle></DialogHeader>
               <div className="grid grid-cols-2 gap-3 mt-2">
                 <div><Label className="text-xs">Name *</Label><Input placeholder="Rahul Sharma" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
                 <div><Label className="text-xs">Phone *</Label><Input placeholder="+919876543210" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
@@ -266,6 +270,7 @@ export default function LeadsSection() {
               </div>
             </DialogContent>
           </Dialog>
+          )}
         </div>
       </div>
 

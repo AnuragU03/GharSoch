@@ -5,11 +5,13 @@ export async function getSidebarCounts(): Promise<{
   leads: number
   clients: number
   appointments: number
+  pendingUsers: number
 }> {
   try {
     const leadsCollection = await getCollection('leads')
     const clientsCollection = await getCollection('clients')
     const appointmentsCollection = await getCollection('appointments')
+    const usersCollection = await getCollection('users')
 
     const todayStart = new Date()
     // Convert to IST offset loosely or just use local startOfDay if running on server
@@ -24,7 +26,7 @@ export async function getSidebarCounts(): Promise<{
     const istTomorrow = new Date(istNow.getTime() + 24 * 60 * 60 * 1000)
     const endOfIstDay = new Date(istTomorrow.getTime() - istOffset)
 
-    const [leads, clients, appointments] = await Promise.all([
+    const [leads, clients, appointments, pendingUsers] = await Promise.all([
       leadsCollection.countDocuments({ status: { $nin: ['closed', 'lost', 'won'] } }),
       clientsCollection.countDocuments({ conversion_status: { $in: ['pending', 'converting'] } }),
       appointmentsCollection.countDocuments({
@@ -33,11 +35,12 @@ export async function getSidebarCounts(): Promise<{
           $lt: endOfIstDay.toISOString(),
         },
       }),
+      usersCollection.countDocuments({ status: 'pending_approval' }),
     ])
 
-    return { leads, clients, appointments }
+    return { leads, clients, appointments, pendingUsers }
   } catch (error) {
     console.error('[SidebarCountsService] Error fetching counts:', error)
-    return { leads: 0, clients: 0, appointments: 0 }
+    return { leads: 0, clients: 0, appointments: 0, pendingUsers: 0 }
   }
 }

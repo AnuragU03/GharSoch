@@ -20,6 +20,7 @@ import {
   PhoneCall,
   Settings,
   Sparkles,
+  UserCog,
   Users,
 } from 'lucide-react'
 import {
@@ -31,6 +32,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import type { UserRole } from '@/models/User'
+import type { Role } from '@/lib/auth/roles'
 
 type NavIcon = LucideIcon
 
@@ -38,7 +40,7 @@ type NavItem = {
   href: string
   label: string
   icon: NavIcon
-  badgeKey?: 'leads' | 'clients' | 'appointments'
+  badgeKey?: 'leads' | 'clients' | 'appointments' | 'pendingUsers'
 }
 
 const WORK: NavItem[] = [
@@ -56,6 +58,7 @@ const INTELLIGENCE: NavItem[] = [
   { href: '/agent-activity', label: 'Agent Activity', icon: Activity },
   { href: '/kb', label: 'Knowledge Base', icon: BookOpen },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
+  { href: '/settings/users', label: 'Users', icon: UserCog, badgeKey: 'pendingUsers' },
 ]
 
 const ROLE_LABEL: Record<string, string> = {
@@ -79,7 +82,7 @@ function NavGroup({
   label: string
   items: NavItem[]
   pathname: string | null
-  counts: { leads: number; clients: number; appointments: number }
+  counts: { leads: number; clients: number; appointments: number; pendingUsers: number }
 }) {
   return (
     <div className="nav-group">
@@ -145,9 +148,13 @@ type SidebarUser = {
 export function SidebarClient({
   counts,
   user,
+  role,
+  allowedNav = [],
 }: {
-  counts: { leads: number; clients: number; appointments: number }
+  counts: { leads: number; clients: number; appointments: number; pendingUsers: number }
   user: SidebarUser | null
+  role?: Role | null
+  allowedNav?: string[]
 }) {
   const pathname = usePathname()
   const settingsActive = isActivePath(pathname, '/settings')
@@ -165,8 +172,8 @@ export function SidebarClient({
   }
 
   const displayName = user?.name ?? user?.email ?? 'User'
-  const role = user?.role ?? ''
-  const displayRole = role ? (ROLE_LABEL[role] ?? role) : 'Guest'
+  const userRole = user?.role ?? role ?? ''
+  const displayRole = userRole ? (ROLE_LABEL[userRole] ?? userRole) : 'Guest'
 
   return (
     <aside className="sidebar">
@@ -179,22 +186,42 @@ export function SidebarClient({
       </div>
 
       <div className="sidebar-nav">
-        <NavGroup label="Work" items={WORK} pathname={pathname} counts={counts} />
-        <div className="nav-divider" aria-hidden="true" />
-        <NavGroup label="Intelligence" items={INTELLIGENCE} pathname={pathname} counts={counts} />
+        {role && allowedNav.length > 0 ? (
+          <>
+            <NavGroup
+              label="Work"
+              items={WORK.filter((item) => allowedNav.includes(item.href))}
+              pathname={pathname}
+              counts={counts}
+            />
+            <div className="nav-divider" aria-hidden="true" />
+            <NavGroup
+              label="Intelligence"
+              items={INTELLIGENCE.filter((item) => allowedNav.includes(item.href))}
+              pathname={pathname}
+              counts={counts}
+            />
+          </>
+        ) : (
+          <div className="px-4 py-8 text-center">
+            <div className="text-[var(--ink-3)] text-[13px]">Access pending</div>
+          </div>
+        )}
       </div>
 
       <div className="sidebar-footer">
         <div className="nav-mini">
-          <Link
-            href="/settings"
-            aria-label="Settings"
-            title="Settings"
-            aria-current={settingsActive ? 'page' : undefined}
-            className={cn('nav-mini-item', settingsActive && 'active')}
-          >
-            <Settings size={15} strokeWidth={1.75} className="shrink-0" aria-hidden="true" />
-          </Link>
+          {allowedNav.includes('/settings') && (
+            <Link
+              href="/settings"
+              aria-label="Settings"
+              title="Settings"
+              aria-current={settingsActive ? 'page' : undefined}
+              className={cn('nav-mini-item', settingsActive && 'active')}
+            >
+              <Settings size={15} strokeWidth={1.75} className="shrink-0" aria-hidden="true" />
+            </Link>
+          )}
           <button
             type="button"
             aria-label="Command palette"

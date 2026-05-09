@@ -6,12 +6,15 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { agentLogger } from '@/lib/agentLogger'
+import { authErrorResponse, requireSession } from '@/lib/auth'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { agentId: string } }
 ) {
   try {
+    await requireSession()
+    // Phase 11.5: filter execution traces by session.user.brokerage_id.
     const { searchParams } = new URL(request.url)
     const runId = searchParams.get('run_id')
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100)
@@ -54,6 +57,8 @@ export async function GET(
       },
     })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[API/Agent/Executions] Error:', error)
     const errorMsg = error instanceof Error ? error.message : 'Server error'
     return NextResponse.json(

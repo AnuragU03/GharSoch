@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCollection } from '@/lib/mongodb'
 import { ObjectId } from 'mongodb'
 import { triggerCampaignCall } from '@/lib/vapiClient'
+import { authErrorResponse, requireRole } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
+    await requireRole(['admin', 'tech'])
+    // Phase 11.5: verify campaign/lead belongs to session.user.brokerage_id.
     const data = await request.json()
     const { campaignId, leadId } = data
 
@@ -180,6 +183,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: false, error: 'leadId or campaignId is required' }, { status: 400 })
   } catch (error) {
+    const authResponse = authErrorResponse(error)
+    if (authResponse) return authResponse
     console.error('[Campaign Trigger] Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }
