@@ -36,20 +36,28 @@ jobs:
           NEXTAUTH_URL: https://gharsoch.tech
           AUTH_URL: https://gharsoch.tech
 
-      - name: Zip artifact for deployment
+      - name: Prepare standalone deployment artifact
         run: |
           cd ${{ env.PROJECT_PATH }}
-          # Copy static and public files into the standalone folder
-          cp -r public .next/standalone/public
-          cp -r .next/static .next/standalone/.next/static
-          cd .next/standalone
-          zip -r ../../release.zip .
+          # Next.js standalone build outputs a self-contained server in .next/standalone/
+          # We need: standalone/* + .next/static/ (assets) + public/ (static files)
+          mkdir -p deploy/.next
+          cp -r .next/standalone/. deploy/
+          cp -r .next/static deploy/.next/static
+          cp -r public deploy/public 2>/dev/null || true
+          # Copy package.json so npm start runs node server.js if Azure chooses npm start.
+          cp package.json deploy/package.json
+
+      - name: Zip deployment artifact
+        run: |
+          cd ${{ env.PROJECT_PATH }}/deploy
+          zip -r ../../deploy.zip .
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: ${{ env.PROJECT_PATH }}/release.zip
+          path: deploy.zip
 
   deploy:
     runs-on: ubuntu-latest
@@ -64,13 +72,36 @@ jobs:
         with:
           name: node-app
 
-      - name: Unzip artifact for deployment
-        run: unzip release.zip
+      - name: Clean wwwroot before deploy
+        run: |
+          # Wipe stale files from previous deploys (for example old app/ and data/ folders).
+          # This workflow uses a publish profile, so clean through Kudu instead of Azure CLI login.
+          python3 - <<'PY' > kudu.env
+          import base64
+          import os
+          import xml.etree.ElementTree as ET
+
+          root = ET.fromstring(os.environ["PUBLISH_PROFILE"])
+          profile = next(
+              p for p in root.findall("publishProfile")
+              if p.attrib.get("publishMethod") == "MSDeploy"
+          )
+          token = f"{profile.attrib['userName']}:{profile.attrib['userPWD']}"
+          print("KUDU_AUTH=" + base64.b64encode(token.encode()).decode())
+          PY
+          set -a
+          . ./kudu.env
+          set +a
+          curl -fsS -X DELETE -H "Authorization: Basic $KUDU_AUTH" "https://${{ env.AZURE_WEBAPP_NAME }}.scm.azurewebsites.net/api/vfs/site/wwwroot/?recursive=true" || true
+          echo "wwwroot cleaned"
+        env:
+          PUBLISH_PROFILE: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_7B6B0D5B6B4B4B4B }}
 
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          slot-name: 'Production'
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_7B6B0D5B6B4B4B4B }}
-          package: .
+          package: deploy.zip
