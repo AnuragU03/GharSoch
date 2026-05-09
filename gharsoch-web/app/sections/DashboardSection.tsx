@@ -1,185 +1,230 @@
 'use client'
-import React, { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { HiOutlineUserGroup, HiOutlinePhone, HiOutlineCalendarDays, HiOutlineMegaphone } from 'react-icons/hi2'
-import { FiTrendingUp, FiActivity } from 'react-icons/fi'
 
-interface DashStats {
-  totalLeads: number; newLeadsToday: number; hotLeads: number; qualifiedLeads: number
-  totalCalls: number; callsToday: number; avgCallDuration: number
-  totalAppointments: number; upcomingAppointments: number
-  activeCampaigns: number; totalCampaigns: number; dncCount: number
-  funnel: { total: number; contacted: number; qualified: number; appointed: number }
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { formatDistanceToNow } from 'date-fns'
+
+import { NewClientModal } from '@/components/modals/NewClientModal'
+import { Pill, type PillVariant } from '@/components/Pill'
+import { RunDetailDrawer } from '@/components/RunDetailDrawer'
+import { StatStrip } from '@/components/StatStrip'
+import { toast } from '@/lib/toast'
+import type { AgentDashboardRun } from '@/lib/services/agentDashboardService'
+import type { DashboardData, DashboardLead } from '@/lib/services/dashboardService'
+
+function delta(current: number, previous: number) {
+  const diff = current - previous
+  if (diff === 0) return 'No change vs yesterday'
+  return `${diff > 0 ? '+' : ''}${diff} vs yesterday`
 }
 
-export default function DashboardSection({ onNavigate }: { onNavigate: (s: string) => void }) {
-  const [stats, setStats] = useState<DashStats | null>(null)
-  const [activities, setActivities] = useState<any[]>([])
-  const [agentLogs, setAgentLogs] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+function statusVariant(status?: string | null): PillVariant {
+  const normalized = String(status || '').toLowerCase()
+  if (normalized === 'success' || normalized === 'completed' || normalized === 'confirmed') return 'success'
+  if (normalized === 'failed' || normalized === 'error' || normalized === 'cancelled') return 'failed'
+  if (normalized === 'running' || normalized === 'started' || normalized === 'dialing') return 'running'
+  if (normalized === 'hot') return 'warm'
+  if (normalized === 'warm') return 'amber'
+  return 'idle'
+}
 
-  useEffect(() => {
-    const fetchAll = async () => {
-      try {
-        const [statsRes, actRes, agentRes] = await Promise.all([
-          fetch('/api/dashboard/stats'),
-          fetch('/api/activities'),
-          fetch('/api/agent-activities')
-        ])
-        const sd = await statsRes.json()
-        const ad = await actRes.json()
-        const agd = await agentRes.json()
-        if (sd.success) setStats(sd.stats)
-        if (ad.success) setActivities(ad.activities)
-        if (agd.success) setAgentLogs(agd.data || [])
-      } catch (e) { console.error(e) }
-      setLoading(false)
-    }
-    fetchAll()
-  }, [])
+function formatTime(iso: string) {
+  return new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(iso))
+}
 
-  if (loading) return <div className="py-12 text-center text-muted-foreground">Loading dashboard...</div>
-  if (!stats) return <div className="py-12 text-center text-destructive">Failed to load dashboard data.</div>
-
-  const funnelData = [
-    { label: 'Total Leads', val: stats.funnel.total, pct: 100, color: '#3b82f6' },
-    { label: 'Contacted', val: stats.funnel.contacted, pct: stats.funnel.total ? Math.round(stats.funnel.contacted / stats.funnel.total * 100) : 0, color: '#f59e0b' },
-    { label: 'Qualified', val: stats.funnel.qualified, pct: stats.funnel.contacted ? Math.round(stats.funnel.qualified / stats.funnel.contacted * 100) : 0, color: '#10b981' },
-    { label: 'Appointments', val: stats.funnel.appointed, pct: stats.funnel.qualified ? Math.round(stats.funnel.appointed / stats.funnel.qualified * 100) : 0, color: '#8b5cf6' },
-  ]
-
-  const latestAgentLog = agentLogs.length > 0 ? agentLogs[0] : null
-
+function runSummary(run: AgentDashboardRun) {
   return (
-    <div className="space-y-6">
-      {/* AI Pulse Pro-Max Banner */}
-      <div 
-        className="w-full relative overflow-hidden rounded-xl border border-primary/20 bg-card cursor-pointer group"
-        onClick={() => onNavigate('agent_ops')}
-      >
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-transparent to-transparent opacity-50"></div>
-        <div className="relative p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="relative flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 border border-primary/30 shrink-0">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-20"></span>
-              <FiActivity className="w-5 h-5 text-primary relative z-10" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-                Autonomous AI Systems Online
-                <span className="text-[10px] font-bold tracking-widest uppercase bg-emerald-500/10 text-emerald-500 px-2 py-0.5 rounded border border-emerald-500/20">Optimal Health</span>
-              </h3>
-              {latestAgentLog ? (
-                <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
-                  <span className="text-primary font-medium">{latestAgentLog.agent_name}</span> completed at {new Date(latestAgentLog.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}: <span className="text-muted-foreground/80">{latestAgentLog.action}</span>
-                </p>
-              ) : (
-                <p className="text-sm text-muted-foreground mt-1">Background agents are standing by. Awaiting scheduled CRON triggers...</p>
-              )}
-            </div>
-          </div>
-          <button className="shrink-0 text-sm font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors px-4 py-2 rounded-lg border border-primary/20 flex items-center gap-2 group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary">
-            View Live Logs
-            <span className="group-hover:translate-x-1 transition-transform">→</span>
-          </button>
-        </div>
-      </div>
+    run.reasoning_summary?.summary ||
+    run.output_data?.summary ||
+    run.reasoning_steps?.[run.reasoning_steps.length - 1]?.content ||
+    'Run completed without a summary yet.'
+  )
+}
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onNavigate('leads')}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Active Leads</CardTitle>
-            <HiOutlineUserGroup className="w-4 h-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalLeads}</div>
-            <p className="text-xs text-muted-foreground mt-1"><span className="text-emerald-500 font-medium">+{stats.newLeadsToday}</span> today • {stats.hotLeads} hot</p>
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onNavigate('calls')}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Calls Made</CardTitle>
-            <HiOutlinePhone className="w-4 h-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalCalls}</div>
-            <p className="text-xs text-muted-foreground mt-1"><span className="text-emerald-500 font-medium">+{stats.callsToday}</span> today • {Math.round(stats.avgCallDuration / 60)}m avg</p>
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onNavigate('appointments')}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Appointments</CardTitle>
-            <HiOutlineCalendarDays className="w-4 h-4 text-purple-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.upcomingAppointments}</div>
-            <p className="text-xs text-muted-foreground mt-1">Upcoming • {stats.totalAppointments} total scheduled</p>
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onNavigate('campaigns')}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Campaigns</CardTitle>
-            <HiOutlineMegaphone className="w-4 h-4 text-amber-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.activeCampaigns}</div>
-            <p className="text-xs text-muted-foreground mt-1">Active out of {stats.totalCampaigns} total</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Funnel */}
-        <Card className="col-span-1 lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2"><FiTrendingUp className="text-primary" /> Conversion Funnel</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6 pt-2">
-              {funnelData.map((f, i) => (
-                <div key={f.label} className="relative">
-                  <div className="flex justify-between text-sm mb-1.5 font-medium">
-                    <span>{f.label}</span>
-                    <span className="text-muted-foreground">{f.val} ({f.pct}%)</span>
-                  </div>
-                  <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${f.pct}%`, backgroundColor: f.color }} />
-                  </div>
-                  {i < funnelData.length - 1 && <div className="absolute -bottom-4 left-1/2 w-px h-3 bg-border" />}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Activity Feed */}
-        <Card className="col-span-1">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2"><FiActivity className="text-primary" /> Live Activity</CardTitle>
-          </CardHeader>
-          <CardContent className="px-0">
-            <div className="h-[280px] overflow-y-auto px-6 space-y-4">
-              {activities.length === 0 ? <p className="text-xs text-muted-foreground text-center">No recent activity</p> :
-                activities.map((a, i) => (
-                  <div key={i} className="flex gap-3">
-                    <div className="mt-0.5">
-                      {a.icon === 'user' ? <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center"><HiOutlineUserGroup className="w-3.5 h-3.5" /></div> :
-                       a.icon === 'phone' ? <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center"><HiOutlinePhone className="w-3.5 h-3.5" /></div> :
-                       <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center"><HiOutlineCalendarDays className="w-3.5 h-3.5" /></div>}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium leading-tight truncate">{a.title}</p>
-                      <p className="text-xs text-muted-foreground truncate">{a.detail}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{new Date(a.timestamp).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}</p>
-                    </div>
-                  </div>
-                ))
-              }
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+function EmptyState({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ padding: '30px 18px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
+      {children}
     </div>
   )
 }
+
+function UrgentLeadRow({ lead, onClick }: { lead: DashboardLead; onClick: () => void }) {
+  const interest = lead.interest_level || lead.status || 'idle'
+
+  return (
+    <button type="button" className="dash-row" onClick={onClick}>
+      <div>
+        <div className="name">{lead.name || 'Unknown lead'}</div>
+        <div className="meta">{lead.phone || 'No phone'} · {lead.location_pref || lead.place || 'No location'}</div>
+      </div>
+      <Pill variant={statusVariant(interest)}>{interest}</Pill>
+      <div className="meta" style={{ textAlign: 'right' }}>
+        {lead.last_contacted_at
+          ? formatDistanceToNow(new Date(lead.last_contacted_at), { addSuffix: true })
+          : lead.next_follow_up_date
+            ? `Due ${formatDistanceToNow(new Date(lead.next_follow_up_date), { addSuffix: true })}`
+            : 'No contact yet'}
+      </div>
+    </button>
+  )
+}
+
+export function DashboardSection({ data }: { data: DashboardData }) {
+  const router = useRouter()
+  const [newLeadOpen, setNewLeadOpen] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [selectedRun, setSelectedRun] = useState<AgentDashboardRun | null>(null)
+
+  const statCells = [
+    { label: 'Calls', value: String(data.today.calls_made), delta: delta(data.today.calls_made, data.yesterday.calls_made) },
+    { label: 'Appointments', value: String(data.today.appointments_today), delta: delta(data.today.appointments_today, data.yesterday.appointments_today) },
+    { label: 'New leads', value: String(data.today.new_leads), delta: delta(data.today.new_leads, data.yesterday.new_leads) },
+    { label: 'Agent runs', value: String(data.today.agent_runs), delta: delta(data.today.agent_runs, data.yesterday.agent_runs) },
+  ]
+
+  return (
+    <>
+      <section className="page active">
+        <div className="crumb">Work · Dashboard</div>
+        <div className="head">
+          <div>
+            <h1 className="title">Operations Dashboard</h1>
+            <p className="sub">Your AI workforce, at a glance.</p>
+          </div>
+          <div className="actions">
+            <button type="button" className="btn" onClick={() => setNewLeadOpen(true)}>
+              + New Lead
+            </button>
+            <button
+              type="button"
+              className="btn primary"
+              onClick={() => toast('Force run all agents coming in Phase 12')}
+            >
+              Force run all agents
+            </button>
+          </div>
+        </div>
+
+        <StatStrip cells={statCells} />
+
+        <div className="dashboard-grid">
+          <div className="dashboard-main">
+            <div className="panel">
+              <div className="panel-head">
+                <div>
+                  <div className="panel-title">Recent agent activity</div>
+                  <div className="panel-sub">Last 6 runs across the agent fleet.</div>
+                </div>
+              </div>
+              {data.recent_runs.length > 0 ? (
+                data.recent_runs.map((run) => (
+                  <button
+                    key={run.run_id}
+                    type="button"
+                    className="row"
+                    onClick={() => {
+                      setSelectedRun(run)
+                      setDrawerOpen(true)
+                    }}
+                  >
+                    <div className="ts">{formatTime(run.started_at)}</div>
+                    <div><span className="agent-tag">{run.agent_name || run.agent_id}</span></div>
+                    <div className="summary">{runSummary(run)}</div>
+                    <div><Pill variant={statusVariant(run.status)}>{run.status}</Pill></div>
+                    <div className="arrow">›</div>
+                  </button>
+                ))
+              ) : (
+                <EmptyState>Nothing here yet. Once agents run, recent activity will populate.</EmptyState>
+              )}
+            </div>
+
+            <div className="panel">
+              <div className="panel-head">
+                <div>
+                  <div className="panel-title">Urgent leads</div>
+                  <div className="panel-sub">Hot or overdue leads that need operator attention.</div>
+                </div>
+              </div>
+              {data.urgent_leads.length > 0 ? (
+                data.urgent_leads.map((lead) => (
+                  <UrgentLeadRow
+                    key={lead._id}
+                    lead={lead}
+                    onClick={() => router.push(`/leads?focus=${lead._id}`)}
+                  />
+                ))
+              ) : (
+                <EmptyState>Nothing here yet. Hot or overdue leads will appear here.</EmptyState>
+              )}
+            </div>
+          </div>
+
+          <div className="dashboard-side">
+            <div className="panel">
+              <div className="panel-head">
+                <div>
+                  <div className="panel-title">Today&apos;s appointments</div>
+                  <div className="panel-sub">Next site visits in the coming 24 hours.</div>
+                </div>
+              </div>
+              {data.upcoming_appointments.length > 0 ? (
+                data.upcoming_appointments.map((appointment) => (
+                  <div className="apt-row" key={appointment._id}>
+                    <div className="apt-time">
+                      <div className="apt-time-h">{formatTime(appointment.scheduled_at).split(':')[0]}</div>
+                      <div className="apt-time-d">{formatTime(appointment.scheduled_at).slice(-2)}</div>
+                    </div>
+                    <div>
+                      <div className="name">{appointment.lead_name || 'Lead'}</div>
+                      <div className="meta">{appointment.property_title || 'Property'} · {appointment.property_location || 'Location pending'}</div>
+                    </div>
+                    <Pill variant={statusVariant(appointment.status)}>{appointment.status}</Pill>
+                  </div>
+                ))
+              ) : (
+                <EmptyState>Nothing here yet. Upcoming visits will populate once booked.</EmptyState>
+              )}
+            </div>
+
+            <div className="panel">
+              <div className="panel-head">
+                <div>
+                  <div className="panel-title">Active campaigns</div>
+                  <div className="panel-sub">Dialing campaigns currently in motion.</div>
+                </div>
+              </div>
+              {data.active_campaigns.length > 0 ? (
+                data.active_campaigns.map((campaign) => {
+                  const total = campaign.target_lead_ids?.length || campaign.total_count || 0
+                  const dialed = campaign.calls_made || campaign.dialed_count || 0
+                  const progress = total > 0 ? Math.min(100, Math.round((dialed / total) * 100)) : 0
+
+                  return (
+                    <div className="campaign-mini" key={campaign._id}>
+                      <div className="name">{campaign.name}</div>
+                      <div className="meta">{dialed} / {total} dialed · {campaign.calls_connected || 0} connected</div>
+                      <div className="mini-progress"><span style={{ width: `${progress}%` }} /></div>
+                    </div>
+                  )
+                })
+              ) : (
+                <EmptyState>Nothing here yet. Dialing campaigns will appear here.</EmptyState>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <NewClientModal open={newLeadOpen} onClose={() => setNewLeadOpen(false)} />
+      <RunDetailDrawer open={drawerOpen} onOpenChange={setDrawerOpen} run={selectedRun} />
+    </>
+  )
+}
+
+export default DashboardSection

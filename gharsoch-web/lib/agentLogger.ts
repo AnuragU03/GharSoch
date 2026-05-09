@@ -65,6 +65,13 @@ export interface AgentExecutionTrace {
   reasoning_steps: ReasoningStep[]
   actions: AgentAction[]
   output_data?: Record<string, any>
+  reasoning_summary?: {
+    summary: string
+    confidence: number
+    generated_at: string
+  }
+  summary_failed?: boolean
+  summary_error?: string
   errors: Array<{
     timestamp: string
     error_message: string
@@ -273,6 +280,52 @@ class AgentLogger {
       this.currentRun.end_time = end_time
       this.currentRun.completed_at = end_time
       this.currentRun.execution_time_ms = computedExecutionTimeMs
+    }
+  }
+
+  async attachSummary(
+    runId: string,
+    payload: { summary: string; confidence: number; generated_at: string }
+  ): Promise<void> {
+    await this.initialize()
+
+    const sanitizedPayload = sanitizeMongoKeys(payload)
+    await this.collection.updateOne(
+      { run_id: runId },
+      {
+        $set: {
+          reasoning_summary: sanitizedPayload,
+          summary_failed: false,
+          summary_error: null,
+          updated_at: new Date().toISOString(),
+        },
+      }
+    )
+
+    if (this.currentRun?.run_id === runId) {
+      this.currentRun.reasoning_summary = sanitizedPayload
+      this.currentRun.summary_failed = false
+      this.currentRun.summary_error = undefined
+    }
+  }
+
+  async markSummaryFailed(runId: string, errorMessage: string): Promise<void> {
+    await this.initialize()
+
+    await this.collection.updateOne(
+      { run_id: runId },
+      {
+        $set: {
+          summary_failed: true,
+          summary_error: errorMessage,
+          updated_at: new Date().toISOString(),
+        },
+      }
+    )
+
+    if (this.currentRun?.run_id === runId) {
+      this.currentRun.summary_failed = true
+      this.currentRun.summary_error = errorMessage
     }
   }
 

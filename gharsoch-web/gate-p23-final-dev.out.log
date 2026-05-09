@@ -1,0 +1,24 @@
+
+> nextjs-project@0.1.0 dev
+> next dev --turbo -p 3000 -p 3006
+
+  ▲ Next.js 14.2.23 (turbo)
+  - Local:        http://localhost:3006
+  - Environments: .env
+
+ ✓ Starting...
+ ✓ Ready in 5.1s
+ ○ Compiling /help ...
+ ✓ Compiled /help in 18.6s
+ GET /help 200 in 21077ms
+ ○ Compiling / ...
+ ✓ Compiled / in 1680ms
+ GET / 200 in 2377ms
+ GET / 200 in 738ms
+ GET / 200 in 645ms
+ GET / 200 in 958ms
+ ✓ Compiled in 2.8s
+ ✓ Compiled / in 174ms
+   Reload env: .env
+ ✓ Compiled in 7.6s
+ ✓ Compiled in 749ms

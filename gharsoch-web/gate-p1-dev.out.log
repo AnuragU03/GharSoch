@@ -1,0 +1,49 @@
+
+> nextjs-project@0.1.0 dev
+> next dev --turbo -p 3000 -p 3004
+
+  ▲ Next.js 14.2.23 (turbo)
+  - Local:        http://localhost:3004
+  - Environments: .env
+
+ ✓ Starting...
+ ✓ Ready in 2.5s
+ ○ Compiling / ...
+ ✓ Compiled / in 7.3s
+ GET / 200 in 9464ms
+ GET / 200 in 783ms
+ ○ Compiling /[...slug] ...
+ ✓ Compiled /[...slug] in 797ms
+ ○ Compiling /leads ...
+ GET /favicon.ico 200 in 2349ms
+ ✓ Compiled /leads in 1566ms
+ GET /favicon.ico 200 in 1071ms
+ GET / 200 in 1569ms
+ GET /favicon.ico 200 in 449ms
+ ✓ Compiled in 1178ms
+ ✓ Compiled in 344ms
+ ✓ Compiled in 218ms
+ ✓ Compiled in 798ms
+ ✓ Compiled in 1261ms
+ ✓ Compiled in 1214ms
+ ✓ Compiled / in 312ms
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 1373ms
+ ✓ Compiled /[...slug] in 212ms
+ ✓ Compiled in 325ms
+ ✓ Compiled in 163ms
+ ✓ Compiled in 263ms
+ ✓ Compiled in 179ms
+ ✓ Compiled in 197ms
+ ✓ Compiled in 288ms
+ ✓ Compiled in 160ms
+ ✓ Compiled in 154ms
+ ✓ Compiled in 233ms
+ ✓ Compiled in 205ms
+ ✓ Compiled in 214ms
+ ✓ Compiled in 1153ms
+ ✓ Compiled in 1895ms
+   Reload env: .env
+ ✓ Compiled in 7.2s
+ ✓ Compiled in 1143ms
+ ✓ Compiled in 9.4s

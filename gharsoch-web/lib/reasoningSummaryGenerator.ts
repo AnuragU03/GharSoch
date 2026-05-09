@@ -1,114 +1,97 @@
-/**
- * Agent Reasoning Summary Generator
- * Generates human-readable explanations of agent reasoning and decisions
- * Can be called after agent actions to provide context
- */
-
+import { agentLogger, type AgentExecutionTrace } from '@/lib/agentLogger'
+import { getCollection } from '@/lib/mongodb'
 import { openaiChatCompletion } from '@/lib/openaiClient'
 
-interface ReasoningSummaryRequest {
-  agent_name: string
-  action_type: string
-  reasoning_steps: Array<{ step_type: string; content: string; confidence?: number }>
-  action_description: string
-  action_result?: Record<string, any>
-  context?: Record<string, any>
+type GeneratedReasoningSummary = {
+  summary: string
+  confidence: number
 }
 
-interface ReasoningSummary {
-  summary: string
-  key_insights: string[]
-  confidence: number
-  implications: string
+const SUMMARY_SYSTEM_PROMPT =
+  'Summarize this agent run in 2-3 sentences for a non-technical admin. Focus on: what the agent decided and why. Confidence score 0-1. Return JSON: { summary: string, confidence: number }'
+
+function clampConfidence(value: unknown) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return 0.5
+  }
+
+  return Math.min(1, Math.max(0, value))
+}
+
+function truncateForSummary(input: string, maxChars = 12_000) {
+  if (input.length <= maxChars) {
+    return input
+  }
+
+  return `${input.slice(0, maxChars)}\n\n[truncated]`
+}
+
+function buildSummaryInput(run: AgentExecutionTrace) {
+  return truncateForSummary(
+    JSON.stringify(
+      {
+        agent_name: run.agent_name,
+        status: run.status,
+        reasoning_steps: run.reasoning_steps?.map((step) => ({
+          step_type: step.step_type,
+          content: step.content,
+          confidence: step.confidence,
+        })),
+        actions: run.actions?.map((action) => ({
+          action_type: action.action_type,
+          description: action.description,
+          status: action.status,
+          error: action.error,
+          result: action.result,
+        })),
+        output: run.output_data || {},
+      },
+      null,
+      2
+    )
+  )
+}
+
+function parseSummaryResponse(content: string): GeneratedReasoningSummary {
+  const parsed = JSON.parse(content)
+
+  if (typeof parsed.summary !== 'string' || parsed.summary.trim().length === 0) {
+    throw new Error('Summary response did not include a summary')
+  }
+
+  return {
+    summary: parsed.summary.trim(),
+    confidence: clampConfidence(parsed.confidence),
+  }
 }
 
 class ReasoningSummaryGenerator {
-  /**
-   * Generate human-readable explanation of agent reasoning
-   */
-  async generateSummary(request: ReasoningSummaryRequest): Promise<ReasoningSummary> {
-    try {
-      // Validate OpenAI key is set
-      if (!process.env.OPENAI_API_KEY) {
-        return this.getFallbackSummary(request)
-      }
+  async generate(runId: string): Promise<void> {
+    const collection = await getCollection<AgentExecutionTrace>('agent_execution_logs')
+    const run = await collection.findOne({ run_id: runId })
 
-      const prompt = this.buildSummaryPrompt(request)
-
-      const { content: responseContent } = await openaiChatCompletion({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `You are an expert at explaining AI agent decision-making in clear, concise language.
-Analyze the agent's reasoning steps and actions, then provide:
-1. A one-sentence summary of what the agent decided and why
-2. Key insights from the reasoning process (3-5 bullet points)
-3. Implications or next steps based on this decision
-
-Format your response as valid JSON with keys: summary, key_insights (array), implications`,
-          },
-          { role: 'user', content: prompt },
-        ],
-        response_format: { type: 'json_object' },
-      })
-
-      if (!responseContent) {
-        return this.getFallbackSummary(request)
-      }
-
-      const parsed = JSON.parse(responseContent)
-      return {
-        summary: parsed.summary || '',
-        key_insights: parsed.key_insights || [],
-        confidence: 0.9,
-        implications: parsed.implications || '',
-      }
-    } catch (error) {
-      console.error('[ReasoningSummaryGenerator] Error:', error)
-      return this.getFallbackSummary(request)
+    if (!run) {
+      throw new Error(`Agent run not found: ${runId}`)
     }
-  }
 
-  /**
-   * Fallback summary when OpenAI call fails
-   */
-  private getFallbackSummary(request: ReasoningSummaryRequest): ReasoningSummary {
-    return {
-      summary: `${request.agent_name} completed action: ${request.action_type}`,
-      key_insights: request.reasoning_steps.map((step) => step.content).slice(0, 3),
-      confidence: 0.5,
-      implications: 'Summary generation unavailable. Review reasoning steps above.',
-    }
-  }
+    const { content } = await openaiChatCompletion({
+      model: 'gpt-4o-mini',
+      response_format: { type: 'json_object' },
+      temperature: 0.2,
+      max_tokens: 300,
+      timeoutMs: 8_000,
+      maxRetries: 0,
+      messages: [
+        { role: 'system', content: SUMMARY_SYSTEM_PROMPT },
+        { role: 'user', content: buildSummaryInput(run) },
+      ],
+    })
 
-  /**
-   * Build prompt for reasoning analysis
-   */
-  private buildSummaryPrompt(request: ReasoningSummaryRequest): string {
-    return `
-AGENT: ${request.agent_name}
-ACTION TYPE: ${request.action_type}
-
-REASONING PROCESS:
-${request.reasoning_steps
-  .map(
-    (step, idx) =>
-      `${idx + 1}. [${step.step_type.toUpperCase()}] ${step.content}${
-        step.confidence ? ` (Confidence: ${(step.confidence * 100).toFixed(0)}%)` : ''
-      }`
-  )
-  .join('\n')}
-
-ACTION TAKEN:
-${request.action_description}
-
-${request.action_result ? `ACTION RESULT:\n${JSON.stringify(request.action_result, null, 2)}\n` : ''}
-
-${request.context ? `CONTEXT:\n${JSON.stringify(request.context, null, 2)}\n` : ''}
-
-Please explain this agent's decision-making in plain language.
-`
+    const summary = parseSummaryResponse(content)
+    await agentLogger.attachSummary(runId, {
+      ...summary,
+      generated_at: new Date().toISOString(),
+    })
   }
 }
 

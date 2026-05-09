@@ -2,12 +2,14 @@ import { agentLogger, type ReasoningStep } from '@/lib/agentLogger'
 import { executionEventBroadcaster } from '@/lib/agentExecutionEventBroadcaster'
 import { getCollection } from '@/lib/mongodb'
 import { openaiChatCompletion, type OpenAIChatMessage } from '@/lib/openaiClient'
+import { reasoningSummaryGenerator } from '@/lib/reasoningSummaryGenerator'
 import {
   triggerCampaignCall,
   triggerOutboundCall,
   triggerReminderCall,
   getCallDetails,
 } from '@/lib/vapiClient'
+import { builderKBService } from '@/lib/builderKBService'
 
 export type AgentTrigger = 'manual' | 'cron' | 'event'
 
@@ -63,6 +65,33 @@ export type AgentRunContext = {
     triggerReminderCall: typeof triggerReminderCall
     getCallDetails: typeof getCallDetails
   }
+
+  kb: {
+    query: (collection: string, filter: object, options?: { limit?: number; project?: object }) => Promise<any[]>
+    searchBuilders: (query: any, opts?: object) => Promise<any[]>
+    getBuilder: (idOrName: string) => Promise<any | null>
+  }
+}
+
+function runWithSummaryDeadline(runId: string) {
+  const timeout = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error('Reasoning summary generation timed out after 8000ms')), 8_000)
+  })
+
+  return Promise.race([reasoningSummaryGenerator.generate(runId), timeout])
+}
+
+function scheduleReasoningSummary(runId: string) {
+  queueMicrotask(() => {
+    void runWithSummaryDeadline(runId).catch(async (error: any) => {
+      const message = error?.message ? String(error.message) : 'Reasoning summary generation failed'
+      try {
+        await agentLogger.markSummaryFailed(runId, message)
+      } catch {
+        // Summary generation must not change the completed response contract.
+      }
+    })
+  })
 }
 
 export async function runAgent<TInput extends Record<string, any>, TOutput>(opts: {
@@ -115,7 +144,12 @@ export async function runAgent<TInput extends Record<string, any>, TOutput>(opts
         opts.agentName,
         actionType,
         description,
-        actionOpts?.error ? 'failed' : 'completed'
+        actionOpts?.error ? 'failed' : 'completed',
+        {
+          parameters: actionOpts?.parameters,
+          result: actionOpts?.result,
+          error: actionOpts?.error,
+        }
       )
     },
 
@@ -123,12 +157,12 @@ export async function runAgent<TInput extends Record<string, any>, TOutput>(opts
       findOne: async (collectionName, filter) => {
         await agentLogger.logAgentAction(runId, 'mongo_read', `findOne ${collectionName}`, { collectionName, filter })
         const collection = await getCollection(collectionName)
-        return (await collection.findOne(filter)) as any
+        return (await collection.findOne(filter)) as T | null
       },
       findMany: async (collectionName, filter) => {
         await agentLogger.logAgentAction(runId, 'mongo_read', `find ${collectionName}`, { collectionName, filter })
         const collection = await getCollection(collectionName)
-        return (await collection.find(filter).toArray()) as any
+        return (await collection.find(filter).toArray()) as T[]
       },
       insertOne: async (collectionName, document) => {
         await agentLogger.logAgentAction(runId, 'mongo_write', `insertOne ${collectionName}`, { collectionName })
@@ -162,10 +196,10 @@ export async function runAgent<TInput extends Record<string, any>, TOutput>(opts
         })
 
         await agentLogger.logAgentAction(runId, 'openai_result', `openai response (${chatOpts.model})`, undefined, {
-          usage: res.usage as any,
+          usage: res.usage as Record<string, number> | undefined,
         })
 
-        return { content: res.content, usage: res.usage as any }
+        return { content: res.content, usage: res.usage as Record<string, number> | undefined }
       },
     },
 
@@ -173,26 +207,74 @@ export async function runAgent<TInput extends Record<string, any>, TOutput>(opts
       triggerOutboundCall: async (params) => {
         await agentLogger.logAgentAction(runId, 'vapi', 'triggerOutboundCall', { assistantId: params.assistantId })
         const res = await triggerOutboundCall(params)
-        await agentLogger.logAgentAction(runId, 'vapi_result', 'triggerOutboundCall result', undefined, res as any)
+        await agentLogger.logAgentAction(runId, 'vapi_result', 'triggerOutboundCall result', undefined, res as Record<string, any>)
         return res
       },
       triggerCampaignCall: async (lead, campaignContext, propertiesContext) => {
         await agentLogger.logAgentAction(runId, 'vapi', 'triggerCampaignCall', { phone: lead.phone })
         const res = await triggerCampaignCall(lead, campaignContext, propertiesContext)
-        await agentLogger.logAgentAction(runId, 'vapi_result', 'triggerCampaignCall result', undefined, res as any)
+        await agentLogger.logAgentAction(runId, 'vapi_result', 'triggerCampaignCall result', undefined, res as Record<string, any>)
         return res
       },
       triggerReminderCall: async (appointment) => {
         await agentLogger.logAgentAction(runId, 'vapi', 'triggerReminderCall', { lead_phone: appointment.lead_phone })
         const res = await triggerReminderCall(appointment)
-        await agentLogger.logAgentAction(runId, 'vapi_result', 'triggerReminderCall result', undefined, res as any)
+        await agentLogger.logAgentAction(runId, 'vapi_result', 'triggerReminderCall result', undefined, res as Record<string, any>)
         return res
       },
       getCallDetails: async (callId) => {
         await agentLogger.logAgentAction(runId, 'vapi', 'getCallDetails', { callId })
         const res = await getCallDetails(callId)
-        await agentLogger.logAgentAction(runId, 'vapi_result', 'getCallDetails result', undefined, { ok: !!res } as any)
+        await agentLogger.logAgentAction(runId, 'vapi_result', 'getCallDetails result', undefined, { ok: !!res })
         return res
+      },
+    },
+
+    kb: {
+      query: async (collection: string, filter: object, options?: { limit?: number, project?: object }) => {
+        const t0 = Date.now()
+        try {
+          const results = await builderKBService.queryRaw(collection, filter, options)
+          await agentLogger.logAgentAction(runId, 'kb_query', `query ${collection}`, { collection, filter }, {
+            hit_count: results.length,
+            latency_ms: Date.now() - t0,
+            results_preview: results.slice(0, 3).map((r: any) => ({ name: r.name || r.builder_name || r.title, score: r.reputation_score })),
+          })
+          return results
+        } catch (err: any) {
+          await agentLogger.logAgentAction(runId, 'kb_query_failed', `query ${collection} failed`, { collection, filter, error: err.message, latency_ms: Date.now() - t0 })
+          throw err
+        }
+      },
+      searchBuilders: async (query: any, opts?: object) => {
+        const t0 = Date.now()
+        try {
+          const results = await builderKBService.searchBuilders(query)
+          await agentLogger.logAgentAction(runId, 'kb_query', 'searchBuilders', { query, opts }, {
+            hit_count: results.length,
+            latency_ms: Date.now() - t0,
+            results_preview: results.slice(0, 3).map((r: any) => ({ name: r.builder_name, score: r.reputation_score })),
+          })
+          return results
+        } catch (err: any) {
+          await agentLogger.logAgentAction(runId, 'kb_query_failed', 'searchBuilders failed', { query, error: err.message, latency_ms: Date.now() - t0 })
+          throw err
+        }
+      },
+      getBuilder: async (idOrName: string) => {
+        const t0 = Date.now()
+        try {
+          const result = await builderKBService.getBuilder(idOrName)
+          await agentLogger.logAgentAction(runId, 'kb_query', 'getBuilder', { idOrName }, {
+            hit_count: result ? 1 : 0,
+            latency_ms: Date.now() - t0,
+            results_preview: result ? [{ name: result.builder_name, score: result.reputation_score }] : [],
+          })
+          return result
+        } catch (err: any) {
+          await agentLogger.logAgentAction(runId, 'kb_query_failed', 'getBuilder failed', { idOrName, error: err.message, latency_ms: Date.now() - t0 })
+          throw err
+        }
       },
     },
   }
@@ -209,10 +291,13 @@ export async function runAgent<TInput extends Record<string, any>, TOutput>(opts
     const output = await opts.handler(ctx, opts.input)
 
     const executionTimeMs = Date.now() - startAt
-    await agentLogger.completeAgentRun(runId, output as any, 'success', executionTimeMs)
-    executionEventBroadcaster.broadcastExecutionCompleted(runId, opts.agentId, opts.agentName, output as any, executionTimeMs)
+    await agentLogger.completeAgentRun(runId, output as Record<string, any>, 'success', executionTimeMs)
+    executionEventBroadcaster.broadcastExecutionCompleted(runId, opts.agentId, opts.agentName, output as Record<string, any>, executionTimeMs)
 
-    return { runId, output }
+    const result = { runId, output }
+    scheduleReasoningSummary(runId)
+
+    return result
   } catch (err: any) {
     const executionTimeMs = Date.now() - startAt
 
@@ -223,7 +308,7 @@ export async function runAgent<TInput extends Record<string, any>, TOutput>(opts
     executionEventBroadcaster.broadcastExecutionError(runId, opts.agentId, opts.agentName, message, type)
 
     try {
-      ;(err as any).runId = runId
+      ;(err as Error & { runId?: string }).runId = runId
     } catch {
       // ignore
     }

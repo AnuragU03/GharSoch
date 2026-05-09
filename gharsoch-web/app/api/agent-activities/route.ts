@@ -1,35 +1,24 @@
 import { NextResponse } from 'next/server'
-import { getCollection, getDb } from '@/lib/mongodb'
+import { listActivityRuns } from '@/lib/services/agentDashboardService'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const db = await getDb()
+    const { searchParams } = new URL(request.url)
+    const limit = Math.min(Number(searchParams.get('limit') || '50'), 100)
+    const skip = Number(searchParams.get('skip') || '0')
+    const agentId = searchParams.get('agentId') || 'all'
+    const result = await listActivityRuns({ limit, skip, agentId })
 
-    // Ensure agent_logs collection exists; create it if not.
-    const collections = await db.listCollections({ name: 'agent_logs' }).toArray()
-    if (collections.length === 0) {
-      // Initialize the collection so future writes work
-      await db.createCollection('agent_logs')
-    }
-
-    const agentLogsCollection = db.collection('agent_logs')
-    // NOTE: Cosmos DB rejects .sort() on un-indexed fields.
-    // Fetch without sort, then sort in JavaScript.
-    const logs = await agentLogsCollection
-      .find({})
-      .limit(100)
-      .toArray()
-
-    // Sort by created_at descending in JavaScript
-    logs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    const latest = logs.slice(0, 50)
-
-    return NextResponse.json({ success: true, data: latest })
+    return NextResponse.json({
+      success: true,
+      data: result.runs,
+      total: result.total,
+      hasMore: skip + result.runs.length < result.total,
+    })
   } catch (error) {
     console.error('[API/AgentActivities] GET Error:', error)
-    // Return empty instead of crashing if the collection is unavailable.
-    return NextResponse.json({ success: true, data: [] })
+    return NextResponse.json({ success: true, data: [], total: 0, hasMore: false })
   }
 }

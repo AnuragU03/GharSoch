@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getCollection } from '@/lib/mongodb'
+import { clientService } from '@/lib/services/clientService'
+import { runClientLeadConverter } from '@/lib/agents/clientLeadConverter'
+import { runMatchmakerForLead } from '@/lib/agents/matchmaker'
 
 export const dynamic = 'force-dynamic'
 
 // GET /api/clients — list all clients
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const clients = await getCollection('clients')
-    const data = await clients.find({}).sort({ created_at: -1 }).toArray()
+    // Phase 11 Auth check placeholder
+    const isAdmin = true;
+    if (!isAdmin) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+
+    const { searchParams } = new URL(request.url)
+    const status = searchParams.get('status') || undefined
+    const source = searchParams.get('source') || undefined
+
+    const data = await clientService.listClients({ status, source })
     return NextResponse.json({ success: true, clients: data })
   } catch (error) {
     console.error('[API/Clients] GET Error:', error)
@@ -18,59 +27,54 @@ export async function GET() {
 // POST /api/clients — add a new client
 export async function POST(request: NextRequest) {
   try {
+    // Phase 11 Auth check placeholder
+    const isAdmin = true;
+    if (!isAdmin) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+
     const body = await request.json()
-    const { name, phone, email, budget_range, location_pref, property_type, timeline, notes } = body
+    const { name, phone, email, budget_range, location_pref, property_type, source, notes } = body
 
     if (!name || !phone) {
       return NextResponse.json({ success: false, error: 'Name and phone are required' }, { status: 400 })
     }
 
-    const clients = await getCollection('clients')
-
-    // Check for duplicate
-    const existing = await clients.findOne({ phone })
-    if (existing) {
+    // Check for duplicate in DB via find() inside a custom block since we only have listClients on service
+    const existingClients = await clientService.listClients({ limit: 1000 })
+    if (existingClients.some(c => c.phone === phone)) {
       return NextResponse.json({ success: false, error: 'A client with this phone number already exists' }, { status: 409 })
     }
 
-    const newClient = {
+    const client = await clientService.createClient({
       name,
       phone,
       email: email || '',
+      source: source || 'manual',
       budget_range: budget_range || '',
       location_pref: location_pref || '',
       property_type: property_type || '',
-      timeline: timeline || '',
       notes: notes || '',
-      status: 'new',                    // new | matched | converted_to_lead
-      ai_match_status: 'pending',       // pending | processing | matched | no_match
-      matched_property_id: null,
-      matched_property_title: null,
-      match_score: null,
-      match_reason: null,
-      lead_id: null,                    // set when converted to lead
-      created_at: new Date(),
-      updated_at: new Date(),
-    }
+    })
 
-    const result = await clients.insertOne(newClient)
-
-    // Trigger AI Matchmaker in background (non-blocking)
-    const cronSecret = process.env.CRON_SECRET
-    // Use http://localhost:3000 for internal API calls to avoid SSL certificate validation errors
-    const baseUrl = 'http://localhost:3000'
-    fetch(`${baseUrl}/api/agent/matchmaker`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(cronSecret ? { authorization: `Bearer ${cronSecret}` } : {}),
-      },
-    }).catch(() => {/* fire-and-forget */})
+    // Fire converter, but don't block the response
+    queueMicrotask(async () => {
+      try {
+        const result = await runClientLeadConverter(client._id!.toString())
+        // If conversion succeeded AND lead is hot/warm, fire Matchmaker too
+        if (result.lead_id && !result.rejected) {
+          // If score is >= 60, it's hot or warm based on agent logic
+          if (result.score && result.score >= 60) {
+            await runMatchmakerForLead(result.lead_id)
+          }
+        }
+      } catch (e) {
+        console.error('Converter pipeline failed:', e)
+      }
+    })
 
     return NextResponse.json({
       success: true,
-      client: { ...newClient, _id: result.insertedId },
-      message: 'Client added. AI Matchmaker triggered in the background.',
+      client_id: client._id,
+      message: 'Client created. Conversion in progress.',
     })
   } catch (error) {
     console.error('[API/Clients] POST Error:', error)

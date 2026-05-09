@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import { Toaster } from 'sonner'
 import './globals.css'
 import { IframeLoggerInit } from '@/components/IframeLoggerInit'
 import ClientProviders from '@/components/ClientProviders'
@@ -26,7 +27,7 @@ export default function RootLayout({
         <ClientProviders>
           {children}
         </ClientProviders>
-
+        <Toaster position="top-right" theme="light" richColors />
       </body>
     </html>
   )

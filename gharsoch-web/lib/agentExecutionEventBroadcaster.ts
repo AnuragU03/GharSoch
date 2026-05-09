@@ -30,6 +30,13 @@ class AgentExecutionEventBroadcaster extends EventEmitter {
     return AgentExecutionEventBroadcaster.instance
   }
 
+  subscribe(eventName: string, listener: (event: AgentExecutionEvent) => void): () => void {
+    this.on(eventName, listener)
+    return () => {
+      this.removeListener(eventName, listener)
+    }
+  }
+
   /**
    * Broadcast execution started event
    */
@@ -91,7 +98,12 @@ class AgentExecutionEventBroadcaster extends EventEmitter {
     agentName: string,
     actionType: string,
     description: string,
-    status: 'pending' | 'completed' | 'failed'
+    status: 'pending' | 'completed' | 'failed',
+    details?: {
+      parameters?: Record<string, any>
+      result?: Record<string, any>
+      error?: string
+    }
   ): void {
     const event: AgentExecutionEvent = {
       type: 'action',
@@ -103,6 +115,9 @@ class AgentExecutionEventBroadcaster extends EventEmitter {
         action_type: actionType,
         description,
         status,
+        parameters: details?.parameters,
+        result: details?.result,
+        error: details?.error,
       },
     }
     this.emit('agent_event', event)

@@ -6,7 +6,6 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAgentConfig } from '@/lib/agentRegistry'
-import { builderKBService } from '@/lib/builderKBService'
 import { runAgent } from '@/lib/runAgent'
 
 const AGENT_ID = '69e8f70b2234567890abcde1'
@@ -79,7 +78,7 @@ export async function POST(request: NextRequest) {
         // Fetch each builder from KB
         for (const builderName of buildersToFetch) {
           await ctx.act('kb_call', `getBuilderData(${builderName})`)
-          const builderData = await builderKBService.getBuilderData(builderName)
+          const builderData = await ctx.kb.getBuilder(builderName)
           if (builderData) {
             builderDataMap[builderName] = builderData
             await ctx.think(
