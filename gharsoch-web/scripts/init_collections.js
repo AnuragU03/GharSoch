@@ -1,3 +1,4 @@
+// DEV ONLY — never run in production against live data
 // Run this ONCE to initialize the agent_logs collection in Cosmos DB
 // Usage: node scripts/init_collections.js
 

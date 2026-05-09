@@ -64,3 +64,19 @@ azure/functions/func_output*.txt
 PHASE_7_IMPLEMENTATION.md
 PHASE_7_QUICK_START.md
 PHASE_7_TESTING.ts
+
+# ─── Company-confidential docs ─────────────────────────────────────────────────
+docs/
+
+# ─── Dev/diagnostic scripts (temp, never production) ──────────────────────────
+scripts/diagnose_users.js
+scripts/promote_admin.js
+scripts/promote_admin.js.disabled
+scripts/vapi_mock_test.js
+scripts/test_cosmos.js
+scripts/bulk_upload_leads.js
+# Keep: scripts/create_indexes.js (infra setup)
+# Keep: scripts/init_collections.js (infra setup)
+
+# ─── Data folder (seed/test JSON — not for git) ────────────────────────────────
+data/
