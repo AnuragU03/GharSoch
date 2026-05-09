@@ -50,3 +50,103 @@ gharsoch-web/azure/functions/func_output*.txt
 gharsoch-web/next-env.d.ts
 .idea/
 .vscode/
+
+
+# ─── Company-confidential docs ─────────────────────────────────────────────────
+docs/
+
+# ─── Dev/diagnostic scripts (temp, never production) ──────────────────────────
+scripts/diagnose_users.js
+scripts/promote_admin.js
+scripts/promote_admin.js.disabled
+scripts/vapi_mock_test.js
+scripts/test_cosmos.js
+scripts/bulk_upload_leads.js
+# Keep: scripts/create_indexes.js (infra setup)
+# Keep: scripts/init_collections.js (infra setup)
+
+# ─── Data folder (seed/test JSON — not for git) ────────────────────────────────
+data/
+
+# ─── Dependencies ──────────────────────────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# ─── Next.js build output ──────────────────────────────────────────────────────
+.next/
+.next-stale*/
+/out/
+/build/
+standalone/
+
+# ─── Testing / Coverage ────────────────────────────────────────────────────────
+/coverage/
+
+# ─── Environment files — NEVER commit secrets ──────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ─── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+gate-*.log
+gate-*-dev.out.log
+gate-*-dev.err.log
+gate-*-verify-dev.out.log
+gate-*-verify-dev.err.log
+.gate*.log
+.tmp-*.log
+phase*.log
+dev_output.txt
+dev_stderr.txt
+build_output.txt
+
+# ─── Misc ──────────────────────────────────────────────────────────────────────
+.DS_Store
+*.pem
+*.tsbuildinfo
+next-env.d.ts
+
+# ─── IDE ───────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+
+# ─── PowerShell scripts (local dev only) ───────────────────────────────────────
+*.ps1
+
+# ─── Vercel ────────────────────────────────────────────────────────────────────
+.vercel
+
+# ─── Azure Functions ───────────────────────────────────────────────────────────
+azure/functions/local.settings.json
+azure/functions/dist/
+azure/functions/node_modules/
+azure/functions/.azurite/
+azure/functions/func_output*.txt
+
+# ─── Legacy phase docs (local development only) ────────────────────────────────
+PHASE_7_IMPLEMENTATION.md
+PHASE_7_QUICK_START.md
+PHASE_7_TESTING.ts
+
+# ─── Company-confidential docs ─────────────────────────────────────────────────
+docs/
+
+# ─── Dev/diagnostic scripts (temp, never production) ──────────────────────────
+scripts/diagnose_users.js
+scripts/promote_admin.js
+scripts/promote_admin.js.disabled
+scripts/vapi_mock_test.js
+scripts/test_cosmos.js
+scripts/bulk_upload_leads.js
+# Keep: scripts/create_indexes.js (infra setup)
+# Keep: scripts/init_collections.js (infra setup)
+
+# ─── Data folder (seed/test JSON — not for git) ────────────────────────────────
+data/

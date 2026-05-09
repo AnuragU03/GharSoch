@@ -25,10 +25,12 @@ import Google from 'next-auth/providers/google'
 import { getCollection } from '@/lib/mongodb'
 import { getDefaultLanding } from '@/lib/auth/roles'
 import type { UserRole, UserStatus } from '@/models/User'
+import { authConfig as baseConfig } from '@/lib/auth.config'
 
 // ─── Auth.js configuration ───────────────────────────────────────────────────
 
 export const authConfig: NextAuthConfig = {
+  ...baseConfig,
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,
@@ -36,12 +38,6 @@ export const authConfig: NextAuthConfig = {
     }),
   ],
 
-  session: { strategy: 'jwt', maxAge: 24 * 60 * 60 }, // 24h
-
-  pages: {
-    signIn: '/auth/signin',
-    error: '/auth/signin',
-  },
 
   callbacks: {
     /**
