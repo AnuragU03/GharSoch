@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { toast } from '@/lib/toast'
+import { signOut } from 'next-auth/react'
 import {
   Activity,
   BarChart3,
@@ -15,14 +15,22 @@ import {
   CircleHelp,
   LayoutDashboard,
   ListFilter,
+  LogOut,
   Megaphone,
   PhoneCall,
   Settings,
   Sparkles,
   Users,
 } from 'lucide-react'
-
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
+import type { UserRole } from '@/models/User'
 
 type NavIcon = LucideIcon
 
@@ -50,11 +58,15 @@ const INTELLIGENCE: NavItem[] = [
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
 ]
 
-function isActivePath(pathname: string, href: string) {
-  if (href === '/') {
-    return pathname === '/'
-  }
+const ROLE_LABEL: Record<string, string> = {
+  admin: 'Admin',
+  broker: 'Broker',
+  tech: 'Tech',
+}
 
+function isActivePath(pathname: string | null, href: string) {
+  if (!pathname) return false
+  if (href === '/') return pathname === '/'
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
@@ -66,7 +78,7 @@ function NavGroup({
 }: {
   label: string
   items: NavItem[]
-  pathname: string
+  pathname: string | null
   counts: { leads: number; clients: number; appointments: number }
 }) {
   return (
@@ -95,7 +107,48 @@ function NavGroup({
   )
 }
 
-export function SidebarClient({ counts }: { counts: { leads: number; clients: number; appointments: number } }) {
+// ─── User pill avatar ─────────────────────────────────────────────────────────
+
+function UserAvatar({ name, image }: { name?: string | null; image?: string | null }) {
+  const initials = (name ?? 'U')
+    .split(' ')
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
+
+  if (image) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={image}
+        alt={name ?? 'User avatar'}
+        className="avatar"
+        style={{ objectFit: 'cover', borderRadius: '50%', width: 32, height: 32 }}
+      />
+    )
+  }
+
+  return <div className="avatar">{initials}</div>
+}
+
+// ─── SidebarClient ────────────────────────────────────────────────────────────
+
+type SidebarUser = {
+  name?: string | null
+  email?: string | null
+  image?: string | null
+  role?: UserRole | null
+  status?: string | null
+}
+
+export function SidebarClient({
+  counts,
+  user,
+}: {
+  counts: { leads: number; clients: number; appointments: number }
+  user: SidebarUser | null
+}) {
   const pathname = usePathname()
   const settingsActive = isActivePath(pathname, '/settings')
   const helpActive = isActivePath(pathname, '/help')
@@ -110,6 +163,10 @@ export function SidebarClient({ counts }: { counts: { leads: number; clients: nu
   const openCommandPalette = () => {
     window.dispatchEvent(new Event('open-command-palette'))
   }
+
+  const displayName = user?.name ?? user?.email ?? 'User'
+  const role = user?.role ?? ''
+  const displayRole = role ? (ROLE_LABEL[role] ?? role) : 'Guest'
 
   return (
     <aside className="sidebar">
@@ -158,18 +215,63 @@ export function SidebarClient({ counts }: { counts: { leads: number; clients: nu
           </Link>
         </div>
 
-        <button
-          type="button"
-          className="user w-full text-left"
-          onClick={() => toast('Account menu coming in Phase 11')}
-        >
-          <div className="avatar">AU</div>
-          <div className="user-copy">
-            <div className="user-name">Anurag Ugargol</div>
-            <div className="user-role">Admin {'\u00B7'} Production</div>
-          </div>
-          <ChevronUp size={14} strokeWidth={1.75} className="user-chevron shrink-0" aria-hidden="true" />
-        </button>
+        {/* ─── User pill with dropdown ─── */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              id="user-pill-trigger"
+              className="user w-full text-left"
+              aria-label="Account menu"
+            >
+              <UserAvatar name={user?.name} image={user?.image} />
+              <div className="user-copy">
+                <div className="user-name">{displayName}</div>
+                <div className="user-role">{displayRole} · Production</div>
+              </div>
+              <ChevronUp size={14} strokeWidth={1.75} className="user-chevron shrink-0" aria-hidden="true" />
+            </button>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent
+            side="top"
+            align="start"
+            sideOffset={8}
+            className="w-56"
+          >
+            {/* Identity header */}
+            <div className="px-3 py-2">
+              <div className="text-xs font-medium text-[var(--ink)] truncate">{displayName}</div>
+              {user?.email && (
+                <div className="text-xs text-[var(--ink-3)] truncate mt-0.5">{user.email}</div>
+              )}
+            </div>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuItem asChild>
+              <Link
+                href="/settings"
+                id="account-settings-link"
+                className="flex items-center gap-2 cursor-pointer"
+              >
+                <Settings size={14} strokeWidth={1.75} />
+                Account settings
+              </Link>
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuItem
+              id="signout-btn"
+              className="flex items-center gap-2 cursor-pointer text-[var(--red)] focus:text-[var(--red)]"
+              onClick={() => signOut({ callbackUrl: '/auth/signin' })}
+            >
+              <LogOut size={14} strokeWidth={1.75} />
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </aside>
   )
