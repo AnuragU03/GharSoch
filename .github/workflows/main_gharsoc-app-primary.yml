@@ -32,6 +32,9 @@ jobs:
           npm run build --if-present
         env:
           DATABASE_URL: mongodb://localhost:27017/unused-during-build
+          AUTH_TRUST_HOST: 'true'
+          NEXTAUTH_URL: https://gharsoch.tech
+          AUTH_URL: https://gharsoch.tech
 
       - name: Zip artifact for deployment
         run: |

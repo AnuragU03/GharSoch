@@ -8,6 +8,8 @@ import {
   getRecentRuns,
 } from '@/lib/services/agentDashboardService'
 
+export const dynamic = 'force-dynamic'
+
 function AIOperationsSkeleton() {
   return (
     <section className="page active">
