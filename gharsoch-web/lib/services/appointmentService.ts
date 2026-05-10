@@ -85,7 +85,10 @@ async function getCollection() {
 
 async function listAllAppointments() {
   const collection = await getCollection()
-  return (await collection.find({}).toArray()).sort(byScheduledAtAscending)
+  return (await collection.find({
+    lead_id: { $exists: true, $nin: ['', null] },
+    property_id: { $exists: true, $nin: ['', null] },
+  }).toArray()).sort(byScheduledAtAscending)
 }
 
 export const appointmentService = {

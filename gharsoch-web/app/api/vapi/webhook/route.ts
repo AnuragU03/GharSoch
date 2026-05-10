@@ -207,12 +207,16 @@ export async function POST(request: NextRequest) {
                 const args = typeof toolCall.function?.arguments === 'string'
                   ? JSON.parse(toolCall.function.arguments)
                   : toolCall.function?.arguments || {}
+                const argsWithCallContext = {
+                  ...args,
+                  __vapi_call_id: parsed.callId,
+                }
 
                 await ctx.act('tool_dispatch', `Dispatching Vapi tool ${toolName}`, {
-                  parameters: { tool_name: toolName, tool_call_id: toolCall.id, args },
+                  parameters: { tool_name: toolName, tool_call_id: toolCall.id, args: argsWithCallContext },
                 })
 
-                result = await dispatchTool(toolName, args, ctx)
+                result = await dispatchTool(toolName, argsWithCallContext, ctx)
               } catch (toolError: any) {
                 const message = typeof toolError?.message === 'string' ? toolError.message : `Tool ${toolName} failed`
                 await ctx.act('tool_dispatch_failed', `Vapi tool ${toolName} failed`, {
