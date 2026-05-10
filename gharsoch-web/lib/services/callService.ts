@@ -42,6 +42,23 @@ export type CallDetail = SerializedCall & {
     reasoning_steps?: any[]
     actions?: any[]
   } | null
+  tool_dispatches: Array<{
+    run_id: string
+    agent_id: string
+    agent_name: string
+    status: string
+    started_at: string
+    tool_name: string
+    reasoning_summary?: {
+      summary: string
+      confidence: number
+      generated_at?: string
+    }
+    input_data?: Record<string, any>
+    output_data?: Record<string, any>
+    reasoning_steps?: any[]
+    actions?: any[]
+  }>
 }
 
 export type CallStripData = {
@@ -95,6 +112,24 @@ async function getCollection() {
   return client.db(DB_NAME).collection<Call>(COLLECTION)
 }
 
+function extractToolName(run: any) {
+  const input = run.input_data || {}
+  const output = run.output_data || {}
+  const actions = Array.isArray(run.actions) ? run.actions : []
+  const toolNames = Array.isArray(input.tool_names) ? input.tool_names.filter(Boolean) : []
+  const outputTool = output.results?.[0]?.toolCallId
+  const dispatched = actions.find((action: any) => action.action_type === 'tool_dispatch')
+  return (
+    input.tool_name ||
+    input.function_name ||
+    toolNames[0] ||
+    dispatched?.parameters?.tool_name ||
+    outputTool ||
+    input.webhook_type ||
+    'voice_event'
+  )
+}
+
 export const callService = {
   async list(options: {
     direction?: string
@@ -128,9 +163,25 @@ export const callService = {
 
     const client = await clientPromise
     const db = client.db(DB_NAME)
-    const [lead, rawRuns, matchedProperty] = await Promise.all([
+    const [lead, rawRuns, toolDispatchDocs, matchedProperty] = await Promise.all([
       call.lead_id ? db.collection('leads').findOne({ _id: new ObjectId(call.lead_id) }) : null,
       db.collection('agent_execution_logs').find({}).limit(250).toArray(),
+      call.vapi_call_id
+        ? db.collection('agent_execution_logs')
+            .find({
+              agent_id: 'voice_orchestrator',
+              $or: [
+                { 'input_data.vapi_call_id': call.vapi_call_id },
+                { 'input_data.call_id': call.vapi_call_id },
+                { 'output_data.callId': call.vapi_call_id },
+                { 'output_data.call_id': call.vapi_call_id },
+                { 'output_data.vapi_call_id': call.vapi_call_id },
+              ],
+            })
+            .sort({ created_at: 1 })
+            .limit(50)
+            .toArray()
+        : [],
       (async () => {
         if (!call.lead_id || !ObjectId.isValid(call.lead_id)) {
           return null
@@ -197,6 +248,19 @@ export const callService = {
             actions: linkedRun.actions,
           }
         : null,
+      tool_dispatches: toolDispatchDocs.map((run: any) => ({
+        run_id: run.run_id,
+        agent_id: run.agent_id,
+        agent_name: run.agent_name,
+        status: run.status,
+        started_at: toIso(run.started_at || run.created_at) || new Date().toISOString(),
+        tool_name: extractToolName(run),
+        reasoning_summary: run.reasoning_summary,
+        input_data: run.input_data,
+        output_data: run.output_data,
+        reasoning_steps: run.reasoning_steps,
+        actions: run.actions,
+      })),
     }
   },
 

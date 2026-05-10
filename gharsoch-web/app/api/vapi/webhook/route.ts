@@ -2,6 +2,7 @@ import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 
 import type { AgentRunContext } from '@/lib/runAgent'
+import { getCollection } from '@/lib/mongodb'
 import { runAgent } from '@/lib/runAgent'
 import { handleEndOfCallReport } from '@/lib/vapi/callReportHandler'
 import { dispatchTool } from '@/lib/vapi/toolRouter'
@@ -22,6 +23,8 @@ type ParsedWebhookPayload = {
   toolCalls: VapiToolCall[]
   callId?: string
 }
+
+const RUN_LOGGABLE_EVENTS = new Set(['function-call', 'tool-calls', 'end-of-call-report'])
 
 function safeCompare(a: string, b: string) {
   const aBuffer = Buffer.from(a)
@@ -159,6 +162,44 @@ async function handleStatusUpdateEvent(ctx: AgentRunContext, payload: any) {
   return { success: true, message: 'Status update processed' }
 }
 
+async function persistStatusUpdateWithoutRun(payload: any) {
+  const callId = extractCallId(payload)
+  const status =
+    payload?.status ||
+    payload?.message?.status ||
+    payload?.call?.status ||
+    payload?.message?.call?.status
+
+  if (!callId || !status) {
+    return
+  }
+
+  const calls = await getCollection('calls')
+  await calls.updateOne(
+    { vapi_call_id: callId },
+    { $set: { call_status: status, updated_at: new Date() } }
+  )
+}
+
+async function persistTranscriptWithoutRun(payload: any) {
+  const callId = extractCallId(payload)
+  const transcript =
+    payload?.transcript ||
+    payload?.message?.transcript ||
+    payload?.artifact?.transcript ||
+    payload?.message?.artifact?.transcript
+
+  if (!callId || !transcript) {
+    return
+  }
+
+  const calls = await getCollection('calls')
+  await calls.updateOne(
+    { vapi_call_id: callId },
+    { $set: { transcript, updated_at: new Date() } }
+  )
+}
+
 export async function POST(request: NextRequest) {
   try {
     const rawBody = await request.text()
@@ -168,6 +209,22 @@ export async function POST(request: NextRequest) {
 
     const parsed = parseWebhookPayload(rawBody)
     const toolNames = summarizeToolCalls(parsed.toolCalls)
+
+    if (!RUN_LOGGABLE_EVENTS.has(parsed.type)) {
+      console.log('[VAPI EVENT]', parsed.type, parsed.callId)
+
+      if (parsed.type === 'status-update') {
+        await persistStatusUpdateWithoutRun(parsed.raw)
+        return NextResponse.json({ success: true, message: 'Status update processed' })
+      }
+
+      if (parsed.type === 'transcript') {
+        await persistTranscriptWithoutRun(parsed.raw)
+        return NextResponse.json({ success: true, message: 'Transcript processed' })
+      }
+
+      return NextResponse.json({ success: true, message: `Unhandled webhook type: ${parsed.type || 'unknown'}` })
+    }
 
     const { output } = await runAgent({
       agentId: 'voice_orchestrator',

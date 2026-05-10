@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { AgentTransitionTimeline, type AgentTransitionItem } from '@/components/AgentTransitionTimeline'
 import { StatStrip } from '@/components/StatStrip'
 import { CallRow } from '@/components/CallRow'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
@@ -18,8 +19,9 @@ function matchesFilter(call: SerializedCall, filter: FilterType) {
 }
 
 function CallDetailDrawer({ detail, open, onClose }: { detail: CallDetail | null; open: boolean; onClose: () => void }) {
+  const [selectedDispatch, setSelectedDispatch] = useState<CallDetail['tool_dispatches'][number] | null>(null)
   const transcript: Array<{ speaker: string; text: string }> = (() => {
-    const raw = detail?.linked_run?.input_data?.transcript || detail?.linked_run?.output_data?.transcript
+    const raw = (detail as any)?.transcript || detail?.linked_run?.input_data?.transcript || detail?.linked_run?.output_data?.transcript
     if (!raw) return []
     if (Array.isArray(raw)) return raw.map((l: any) => ({ speaker: String(l.speaker || l.role || 'Agent'), text: String(l.text || l.content || '') })).filter(l => l.text)
     if (typeof raw === 'string') return raw.split('\n').filter(Boolean).map(line => {
@@ -28,6 +30,14 @@ function CallDetailDrawer({ detail, open, onClose }: { detail: CallDetail | null
     })
     return []
   })()
+  const timelineItems: AgentTransitionItem[] = (detail?.tool_dispatches || []).map((run) => ({
+    id: run.run_id,
+    label: run.tool_name,
+    status: run.status,
+    timestamp: run.started_at,
+    description: run.reasoning_summary?.summary || run.output_data?.message || run.output_data?.results?.[0]?.result?.message,
+    details: run,
+  }))
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
@@ -59,12 +69,50 @@ function CallDetailDrawer({ detail, open, onClose }: { detail: CallDetail | null
                 )}
               </div>
             </div>
-            {(detail as any).recording_url && (
-              <div className="drawer-section">
-                <h4>Recording</h4>
-                <audio controls src={(detail as any).recording_url} style={{ width: '100%', borderRadius: 8 }} />
-              </div>
-            )}
+            <div className="drawer-section">
+              <h4>Recording</h4>
+              {(detail as any).recording_url ? (
+                <>
+                  <a
+                    href={(detail as any).recording_url}
+                    download={`call-${detail.vapi_call_id}.mp3`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn sm"
+                    style={{ display: 'inline-flex', marginBottom: 10 }}
+                  >
+                    ↓ Download recording
+                  </a>
+                  <audio controls src={(detail as any).recording_url} style={{ width: '100%', borderRadius: 8 }} />
+                </>
+              ) : (
+                <span style={{ color: 'var(--ink-3)', fontSize: 13 }}>Recording unavailable</span>
+              )}
+            </div>
+            <div className="drawer-section">
+              <h4>Tool dispatches</h4>
+              <AgentTransitionTimeline
+                items={timelineItems}
+                baseTimestamp={detail.created_at}
+                onSelect={(item) => setSelectedDispatch((item.details as CallDetail['tool_dispatches'][number]) || null)}
+              />
+              {selectedDispatch && (
+                <details className="mt-3 rounded-lg border border-hairline bg-surface-2 p-3" open>
+                  <summary className="cursor-pointer text-[12px] font-medium text-ink">
+                    {selectedDispatch.tool_name} reasoning
+                  </summary>
+                  {selectedDispatch.reasoning_summary?.summary ? (
+                    <p className="mb-3 mt-2 text-[12px] leading-5 text-ink-2">{selectedDispatch.reasoning_summary.summary}</p>
+                  ) : null}
+                  <pre className="code max-h-64 overflow-auto">{JSON.stringify({
+                    run_id: selectedDispatch.run_id,
+                    status: selectedDispatch.status,
+                    input_data: selectedDispatch.input_data,
+                    output_data: selectedDispatch.output_data,
+                  }, null, 2)}</pre>
+                </details>
+              )}
+            </div>
             {transcript.length > 0 && (
               <div className="drawer-section">
                 <h4>Transcript</h4>
@@ -88,6 +136,14 @@ function CallDetailDrawer({ detail, open, onClose }: { detail: CallDetail | null
                   )}
                   <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 3, fontFamily: 'monospace' }}>run_id: {detail.linked_run.run_id}</div>
                 </div>
+              </div>
+            )}
+            {detail.tool_dispatches.length > 0 && (
+              <div className="drawer-section">
+                <details>
+                  <summary className="cursor-pointer text-[13px] font-medium text-ink">Raw tool dispatches</summary>
+                  <pre className="code mt-3 max-h-80 overflow-auto">{JSON.stringify(detail.tool_dispatches, null, 2)}</pre>
+                </details>
               </div>
             )}
             {(detail as any).call_summary && (
