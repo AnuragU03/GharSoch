@@ -2,8 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { formatDistanceToNow } from 'date-fns';
-import { Badge } from '@/components/ui/badge';
+import { ClientRow } from '@/components/ClientRow';
 import { NewClientModal } from '@/components/modals/NewClientModal';
 import { Client } from '@/models/Client';
 import { useUserRole } from '@/lib/auth/useUserRole';
@@ -23,6 +22,7 @@ export function ClientsSection({ initialClients }: { initialClients: Client[] })
   const [modalOpen, setModalOpen] = useState(false);
   const { role } = useUserRole();
   const canAdd = role === 'admin' || role === 'tech';
+  const canManage = role === 'admin' || role === 'tech';
 
   const handleStatusFilter = (status: string) => {
     const params = new URLSearchParams(searchParams);
@@ -32,16 +32,6 @@ export function ClientsSection({ initialClients }: { initialClients: Client[] })
       params.delete('status');
     }
     router.push(`/clients?${params.toString()}`);
-  };
-
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case 'converted': return 'success';
-      case 'converting': return 'warning';
-      case 'rejected': return 'destructive';
-      case 'pending': return 'secondary';
-      default: return 'outline';
-    }
   };
 
   return (
@@ -88,43 +78,19 @@ export function ClientsSection({ initialClients }: { initialClients: Client[] })
                 <th className="px-4 py-3 font-medium">Preferences</th>
                 <th className="px-4 py-3 font-medium">Conversion</th>
                 <th className="px-4 py-3 font-medium">Created</th>
+                {canManage ? <th className="px-4 py-3 font-medium text-right">Actions</th> : null}
               </tr>
             </thead>
             <tbody className="divide-y divide-hairline">
               {initialClients.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-ink-3">
+                  <td colSpan={canManage ? 7 : 6} className="px-4 py-8 text-center text-ink-3">
                     No clients found matching the criteria.
                   </td>
                 </tr>
               ) : (
                 initialClients.map((client) => (
-                  <tr key={client._id?.toString()} className="hover:bg-surface-2/50 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-ink">{client.name}</div>
-                      {client.email && <div className="text-xs text-ink-3">{client.email}</div>}
-                    </td>
-                    <td className="px-4 py-3 text-ink-2">{client.phone}</td>
-                    <td className="px-4 py-3 text-ink-2 capitalize">{client.source.replace('_', ' ')}</td>
-                    <td className="px-4 py-3 text-ink-2">
-                      <div className="flex flex-wrap gap-1">
-                        {client.budget_range && <Badge variant="outline" className="text-[10px]">{client.budget_range}</Badge>}
-                        {client.location_pref && <Badge variant="outline" className="text-[10px]">{client.location_pref}</Badge>}
-                        {client.property_type && <Badge variant="outline" className="text-[10px]">{client.property_type}</Badge>}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge variant={getStatusBadgeVariant(client.conversion_status)} className="capitalize">
-                        {client.conversion_status}
-                      </Badge>
-                      {client.conversion_status === 'converted' && client.lead_score !== undefined && (
-                        <span className="ml-2 text-xs font-medium text-ink-3">Score: {client.lead_score}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-ink-3">
-                      {formatDistanceToNow(new Date(client.created_at), { addSuffix: true })}
-                    </td>
-                  </tr>
+                  <ClientRow key={client._id?.toString() || client.phone} client={client} canManage={canManage} />
                 ))
               )}
             </tbody>
