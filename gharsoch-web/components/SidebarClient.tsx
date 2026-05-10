@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -12,7 +11,7 @@ import {
   Building2,
   CalendarClock,
   ChevronUp,
-  CircleHelp,
+  HelpCircle,
   LayoutDashboard,
   ListFilter,
   LogOut,
@@ -157,20 +156,6 @@ export function SidebarClient({
   allowedNav?: string[]
 }) {
   const pathname = usePathname()
-  const settingsActive = isActivePath(pathname, '/settings')
-  const helpActive = isActivePath(pathname, '/help')
-  const [shortcut, setShortcut] = useState('\u2318K')
-
-  useEffect(() => {
-    const nav = navigator as Navigator & { userAgentData?: { platform?: string } }
-    const platform = nav.userAgentData?.platform || navigator.platform || navigator.userAgent
-    setShortcut(/mac|iphone|ipad|ipod/i.test(platform) ? '\u2318K' : 'Ctrl+K')
-  }, [])
-
-  const openCommandPalette = () => {
-    window.dispatchEvent(new Event('open-command-palette'))
-  }
-
   const displayName = user?.name ?? user?.email ?? 'User'
   const userRole = user?.role ?? role ?? ''
   const displayRole = userRole ? (ROLE_LABEL[userRole] ?? userRole) : 'Guest'
@@ -210,38 +195,6 @@ export function SidebarClient({
       </div>
 
       <div className="sidebar-footer">
-        <div className="nav-mini">
-          {allowedNav.includes('/settings') && (
-            <Link
-              href="/settings"
-              aria-label="Settings"
-              title="Settings"
-              aria-current={settingsActive ? 'page' : undefined}
-              className={cn('nav-mini-item', settingsActive && 'active')}
-            >
-              <Settings size={15} strokeWidth={1.75} className="shrink-0" aria-hidden="true" />
-            </Link>
-          )}
-          <button
-            type="button"
-            aria-label="Command palette"
-            title={`Command palette (${shortcut})`}
-            className="nav-mini-item"
-            onClick={openCommandPalette}
-          >
-            <kbd className="kbd-chip">{shortcut}</kbd>
-          </button>
-          <Link
-            href="/help"
-            aria-label="Help"
-            title="Help"
-            aria-current={helpActive ? 'page' : undefined}
-            className={cn('nav-mini-item', helpActive && 'active')}
-          >
-            <CircleHelp size={15} strokeWidth={1.75} className="shrink-0" aria-hidden="true" />
-          </Link>
-        </div>
-
         {/* ─── User pill with dropdown ─── */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -284,6 +237,17 @@ export function SidebarClient({
               >
                 <Settings size={14} strokeWidth={1.75} />
                 Account settings
+              </Link>
+            </DropdownMenuItem>
+
+            <DropdownMenuItem asChild>
+              <Link
+                href="/help"
+                id="help-link"
+                className="flex items-center gap-2 cursor-pointer"
+              >
+                <HelpCircle size={14} strokeWidth={1.75} />
+                Help &amp; About
               </Link>
             </DropdownMenuItem>
 
