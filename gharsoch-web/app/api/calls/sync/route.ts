@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCollection } from '@/lib/mongodb'
 import OpenAI from 'openai'
+import { getAgentConfig } from '@/lib/agentRegistry'
 import { authErrorResponse, requireRole } from '@/lib/auth'
+import { runAgent } from '@/lib/runAgent'
 
 const VAPI_API_KEY = process.env.VAPI_API_KEY || ''
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' })
@@ -60,6 +62,102 @@ async function analyzeTranscript(transcript: string) {
     console.error('[CallSync] GPT extraction error:', err)
     return {}
   }
+}
+
+async function runCallStateValidation(callData: any, leadState: any) {
+  const agentConfig = getAgentConfig('69e8f70b1234567890abcde0')
+  if (!agentConfig) {
+    throw new Error('State Validator agent not found')
+  }
+
+  const { runId, output } = await runAgent({
+    agentId: agentConfig.id,
+    agentName: agentConfig.name,
+    trigger: 'event',
+    input: { call_data: callData, lead_state: leadState },
+    metadata: { model: agentConfig.model, provider: agentConfig.provider },
+    handler: async (ctx, input) => {
+      const validationPrompt = `
+Please validate the following call outcome against the current lead state.
+
+CALL DATA:
+- Disposition: ${callData.disposition || 'unknown'}
+- Call Outcome: ${callData.call_outcome || 'unknown'}
+- Customer Interest Level: ${callData.customer_interest_level || 'unknown'}
+- Follow-up Required: ${callData.follow_up_required !== undefined ? callData.follow_up_required : 'unknown'}
+
+LEAD STATE:
+- Status: ${leadState.status || 'unknown'}
+- Qualification Status: ${leadState.qualification_status || 'unknown'}
+- Interest Level: ${leadState.interest_level || 'unknown'}
+- Follow-up Required: ${leadState.follow_up_required !== undefined ? leadState.follow_up_required : 'unknown'}
+
+Check for conflicts and inconsistencies. Return validation results.`
+
+      await ctx.think(
+        'evaluation',
+        'Analyzing call outcome and lead state for consistency',
+        { confidence: 1.0 }
+      )
+
+      const { content: responseContent } = await ctx.openai.chat({
+        model: agentConfig.model || 'gpt-4o',
+        messages: [
+          { role: 'system', content: agentConfig.systemPrompt },
+          { role: 'user', content: validationPrompt },
+        ],
+        response_format: { type: 'json_object' },
+      })
+
+      let validationResult: any = {}
+      try {
+        validationResult = JSON.parse(responseContent || '{}')
+      } catch {
+        validationResult = { text: responseContent }
+      }
+
+      await ctx.think(
+        'result_analysis',
+        `Validation complete: status=${validationResult?.validation_status}, issues found=${validationResult?.issues?.length || 0}`,
+        { confidence: 0.95 }
+      )
+
+      const validationRecord = {
+        lead_id: input.call_data.lead_id,
+        previous_state: input.lead_state,
+        new_state: input.lead_state,
+        trigger: {
+          type: 'call_sync',
+          agent_name: agentConfig.name,
+          call_id: input.call_data._id || input.call_data.vapi_call_id,
+        },
+        validation: {
+          validator_agent_run_id: ctx.runId,
+          status: validationResult?.validation_status || 'valid',
+          issues: validationResult?.issues || [],
+          corrections_applied: validationResult?.recommended_corrections || {},
+        },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+
+      const insertRes = await ctx.db.insertOne('lead_state_history', validationRecord)
+      await ctx.act('database_insert', 'State validation record saved', {
+        result: { collection: 'lead_state_history', inserted_id: insertRes.insertedId },
+      })
+
+      return {
+        run_id: ctx.runId,
+        validation_status: validationResult?.validation_status || 'valid',
+        issues: validationResult?.issues || [],
+        recommended_corrections: validationResult?.recommended_corrections || {},
+        confidence: validationResult?.confidence || 0.8,
+        reasoning: validationResult?.reasoning || '',
+      }
+    },
+  })
+
+  return { runId, output }
 }
 
 /**
@@ -247,41 +345,33 @@ export async function POST(request: NextRequest) {
       // Call State Validator to check for inconsistencies
       try {
         if (updatedLead) {
-          const validationResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/agent/call-state-validator`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              call_data: {
-                _id: call._id.toString(),
-                vapi_call_id: call.vapi_call_id,
-                lead_id: call.lead_id,
-                disposition: extractedData.disposition,
-                call_outcome: extractedData.call_outcome,
-                customer_interest_level: extractedData.customer_interest_level,
-                follow_up_required: extractedData.follow_up_required,
-              },
-              lead_state: {
-                status: updatedLead.status,
-                qualification_status: updatedLead.qualification_status,
-                interest_level: updatedLead.interest_level,
-                follow_up_required: updatedLead.follow_up_required,
-              },
-            }),
-          })
+          const { output } = await runCallStateValidation(
+            {
+              _id: call._id.toString(),
+              vapi_call_id: call.vapi_call_id,
+              lead_id: call.lead_id,
+              disposition: extractedData.disposition,
+              call_outcome: extractedData.call_outcome,
+              customer_interest_level: extractedData.customer_interest_level,
+              follow_up_required: extractedData.follow_up_required,
+            },
+            {
+              status: updatedLead.status,
+              qualification_status: updatedLead.qualification_status,
+              interest_level: updatedLead.interest_level,
+              follow_up_required: updatedLead.follow_up_required,
+            }
+          )
 
-          if (validationResponse.ok) {
-            const validationData = await validationResponse.json()
-            // Store validator run_id in call record for auditing
-            await calls.updateOne(
-              { _id: call._id },
-              {
-                $set: {
-                  validator_status: validationData.data?.validation_status || 'valid',
-                  validator_run_id: validationData.data?.run_id,
-                },
-              }
-            )
-          }
+          await calls.updateOne(
+            { _id: call._id },
+            {
+              $set: {
+                validator_status: output?.validation_status || 'valid',
+                validator_run_id: output?.run_id,
+              },
+            }
+          )
         }
       } catch (validationError) {
         console.error('[CallSync] State validation error (non-blocking):', validationError)

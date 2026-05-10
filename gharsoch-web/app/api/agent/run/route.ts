@@ -1,18 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { runMatchmaker } from '@/lib/agents/matchmaker'
 import { authErrorResponse, requireRole } from '@/lib/auth'
+import { GET as runFollowUpRoute } from '@/app/api/cron/follow-up/route'
+import { POST as runReEngageRoute } from '@/app/api/cron/re-engage/route'
+import { POST as runRemindersRoute } from '@/app/api/cron/reminders/route'
 
 export const dynamic = 'force-dynamic'
 
 const AGENT_RUNNERS = {
-  matchmaker: { endpoint: '/api/agent/matchmaker', method: 'POST' },
-  reminders: { endpoint: '/api/cron/reminders', method: 'GET' },
-  're-engage': { endpoint: '/api/cron/re-engage', method: 'GET' },
-  'follow-up': { endpoint: '/api/cron/follow-up', method: 'GET' },
+  matchmaker: async () => {
+    const data = await runMatchmaker()
+    return { success: true, status: 200, message: data?.summary || 'Matchmaker run completed.', data }
+  },
+  reminders: async () => routeToJson(runRemindersRoute, 'POST', { 'x-cron-secret': process.env.CRON_SECRET || '' }),
+  're-engage': async () => routeToJson(runReEngageRoute, 'POST', { 'x-cron-secret': process.env.CRON_SECRET || '' }),
+  'follow-up': async () => routeToJson(runFollowUpRoute, 'GET', { authorization: `Bearer ${process.env.CRON_SECRET || ''}` }),
 } as const
 
 type AgentId = keyof typeof AGENT_RUNNERS
 
-async function readJson(response: Response) {
+async function readJson(response: Response | NextResponse) {
   const text = await response.text()
   if (!text) return {}
 
@@ -20,6 +27,28 @@ async function readJson(response: Response) {
     return JSON.parse(text)
   } catch {
     return { message: text }
+  }
+}
+
+async function routeToJson(
+  handler: (request: NextRequest) => Promise<Response | NextResponse>,
+  method: string,
+  headers: HeadersInit
+) {
+  const response = await handler(
+    new NextRequest('http://internal.local/manual-agent-run', {
+      method,
+      headers,
+    })
+  )
+  const data = await readJson(response)
+  const message = data.message || data.error || response.statusText || 'Agent run completed.'
+
+  return {
+    success: response.ok && data.success !== false,
+    status: response.status,
+    message,
+    data,
   }
 }
 
@@ -47,36 +76,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const cronSecret = process.env.CRON_SECRET
-    // Use http://localhost:3000 for internal API calls to avoid SSL certificate validation errors
-    // (Azure reverse proxy causes issues with external domain HTTPS for internal requests)
-    const targetUrl = new URL(runner.endpoint, 'http://localhost:3000')
-    const headers: HeadersInit = { 'Content-Type': 'application/json' }
-
-    if (cronSecret) {
-      headers.authorization = `Bearer ${cronSecret}`
-    }
-
-    const response = await fetch(targetUrl, {
-      method: runner.method,
-      headers,
-      cache: 'no-store',
-    }).catch((fetchError) => {
-      console.error(`[API/Agent/Run] Fetch failed for ${runner.endpoint}:`, fetchError)
-      throw new Error(`Failed to reach ${runner.endpoint}: ${fetchError.message}`)
-    })
-    const data = await readJson(response)
-    const message = data.message || data.error || response.statusText || 'Agent run completed.'
+    const result = await runner()
 
     return NextResponse.json(
       {
-        success: response.ok && data.success !== false,
-        status: response.status,
+        success: result.success,
+        status: result.status,
         agent_id,
-        message,
-        data,
+        message: result.message,
+        data: result.data,
       },
-      { status: response.ok ? 200 : response.status }
+      { status: result.success ? 200 : result.status }
     )
   } catch (error) {
     const authResponse = authErrorResponse(error)

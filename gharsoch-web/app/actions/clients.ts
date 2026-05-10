@@ -1,11 +1,11 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { cookies } from 'next/headers';
 
+import { runClientLeadConverter } from '@/lib/agents/clientLeadConverter';
+import { runMatchmakerForLead } from '@/lib/agents/matchmaker';
 import { requireRole } from '@/lib/auth';
-
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+import { clientService } from '@/lib/services/clientService';
 
 export async function createClientAction(formData: FormData) {
   await requireRole(['admin', 'tech']);
@@ -35,16 +35,23 @@ export async function createClientAction(formData: FormData) {
   };
 
   try {
-    const res = await fetch(`${BASE_URL}/api/clients`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Cookie: cookies().toString() },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      return { success: false, error: data.error || 'Failed to create client.' };
+    const existingClients = await clientService.listClients({ limit: 1000 });
+    if (existingClients.some((client) => client.phone === phone)) {
+      return { success: false, error: 'A client with this phone number already exists.' };
     }
+
+    const client = await clientService.createClient(payload);
+
+    queueMicrotask(async () => {
+      try {
+        const result = await runClientLeadConverter(client._id!.toString());
+        if (result.lead_id && !result.rejected && result.score && result.score >= 60) {
+          await runMatchmakerForLead(result.lead_id);
+        }
+      } catch (error) {
+        console.error('Converter pipeline failed:', error);
+      }
+    });
 
     revalidatePath('/clients');
     revalidatePath('/ai-operations');
