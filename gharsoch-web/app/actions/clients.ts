@@ -67,25 +67,46 @@ export async function createClientAction(formData: FormData) {
 
 export async function updateClientAction(formData: FormData) {
   await requireRole(['admin', 'tech']);
-  const id = formData.get('id') as string;
-  if (!id) return { success: false, error: 'Client ID is required.' };
+  const clientId = String(formData.get('id') || '').trim();
+  if (!ObjectId.isValid(clientId)) {
+    return { ok: false, error: 'Invalid client ID' };
+  }
 
-  const payload: any = {};
-  const fields = ['name', 'phone', 'email', 'source', 'property_type', 'budget_range', 'location_pref', 'notes', 'conversion_status'];
+  const updates: Record<string, unknown> = {};
+  const allowedFields = ['name', 'phone', 'email', 'budget_range', 'location_pref', 'property_type', 'notes'] as const;
 
-  fields.forEach(field => {
-    const val = formData.get(field);
-    if (val !== null) payload[field] = val;
+  allowedFields.forEach((field) => {
+    if (!formData.has(field)) return;
+    const value = String(formData.get(field) || '').trim();
+    updates[field] = value;
   });
 
+  if (Object.keys(updates).length === 0) {
+    return { ok: false, error: 'No valid client fields provided for update.' };
+  }
+
   try {
-    await clientService.updateClient(id, payload);
+    const col = await getCollection('clients');
+    const result = await col.updateOne(
+      { _id: new ObjectId(clientId), deleted_at: { $exists: false } },
+      {
+        $set: {
+          ...updates,
+          updated_at: new Date(),
+        },
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return { ok: false, error: 'Client not found' };
+    }
+
     revalidatePath('/clients');
     revalidatePath('/ai-operations');
-    return { success: true };
+    return { ok: true };
   } catch (error: any) {
-    console.error('Update client error:', error);
-    return { success: false, error: 'Failed to update client.' };
+    console.error('[UPDATE_CLIENT]', error);
+    return { ok: false, error: error?.message || 'Failed to update client.' };
   }
 }
 
