@@ -239,7 +239,24 @@ export function AIOperationsSection({
         {activeTab === 'activity' ? (
           <LiveActivityFeed initialRuns={recentRuns} showFilterChips={true} showPauseButton={true} />
         ) : null}
-        {activeTab === 'system' ? tabPanel('System map') : null}
+        {activeTab === 'system' ? (
+          <div className="panel" style={{ padding: 24 }}>
+            <div className="panel-title">System map</div>
+            <div className="panel-sub">Visualize how agents connect and dispatch</div>
+            <div style={{ marginTop: 16 }}>
+              <SystemMap
+                agents={allAgents.map((agent) => ({ id: agent.id, name: agent.name, triggerLabel: agent.triggerLabel }))}
+                onNodeClick={(agentId) => {
+                  const run = runMap.get(agentId)
+                  if (run?.run_id) {
+                    setSelectedRunId(run.run_id)
+                    setDrawerOpen(true)
+                  }
+                }}
+              />
+            </div>
+          </div>
+        ) : null}
         {activeTab === 'costs' ? <CostsTab /> : null}
       </section>
 
