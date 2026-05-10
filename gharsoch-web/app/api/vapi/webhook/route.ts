@@ -210,6 +210,11 @@ export async function POST(request: NextRequest) {
     const parsed = parseWebhookPayload(rawBody)
     const toolNames = summarizeToolCalls(parsed.toolCalls)
 
+    console.log('[VAPI WEBHOOK] type:', parsed.raw?.message?.type || parsed.raw?.type)
+    if (parsed.type === 'end-of-call-report') {
+      console.log('[VAPI WEBHOOK] end-of-call payload (first 2000 chars):', rawBody.substring(0, 2000))
+    }
+
     if (!RUN_LOGGABLE_EVENTS.has(parsed.type)) {
       console.log('[VAPI EVENT]', parsed.type, parsed.callId)
 
