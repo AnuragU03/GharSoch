@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { MoreHorizontal, Trash2 } from 'lucide-react'
+import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { deletePropertyAction } from '@/app/actions/properties'
@@ -93,6 +93,18 @@ export function PropertyCard({
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
+                {onClick ? (
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault()
+                      setMenuOpen(false)
+                      onClick(property)
+                    }}
+                  >
+                    <Pencil size={15} strokeWidth={1.8} />
+                    Edit
+                  </DropdownMenuItem>
+                ) : null}
                 <DropdownMenuItem
                   className="text-red-600 focus:text-red-600"
                   onSelect={(event) => {

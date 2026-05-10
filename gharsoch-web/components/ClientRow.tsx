@@ -1,17 +1,17 @@
 'use client'
 
-import { useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatDistanceToNow } from 'date-fns'
-import { Trash2 } from 'lucide-react'
+import { Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { deleteClientAction } from '@/app/actions/clients'
+import { NewClientModal } from '@/components/modals/NewClientModal'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import type { Client } from '@/models/Client'
-import { useState } from 'react'
 
 function getStatusBadgeVariant(status: string) {
   switch (status) {
@@ -36,17 +36,20 @@ export function ClientRow({
   canManage: boolean
 }) {
   const router = useRouter()
+  const [editOpen, setEditOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [isDeleting, startDeleteTransition] = useTransition()
 
+  const clientId = client._id?.toString() || ''
+
   const handleDelete = () => {
-    if (!client._id) {
+    if (!clientId) {
       toast.error('Client is missing an ID')
       return
     }
 
     startDeleteTransition(async () => {
-      const result = await deleteClientAction(client._id!.toString())
+      const result = await deleteClientAction(clientId)
       if (!result.ok) {
         toast.error(result.error || 'Failed to delete client')
         return
@@ -86,19 +89,38 @@ export function ClientRow({
         </td>
         {canManage ? (
           <td className="px-4 py-3 text-right">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-ink-3 hover:bg-red-50 hover:text-red-600"
-              aria-label={`Delete ${client.name}`}
-              onClick={() => setConfirmOpen(true)}
-            >
-              <Trash2 size={16} strokeWidth={1.8} />
-            </Button>
+            <div className="flex items-center justify-end gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-ink-3 hover:bg-surface-3 hover:text-ink"
+                aria-label={`Edit ${client.name}`}
+                onClick={() => setEditOpen(true)}
+              >
+                <Pencil size={16} strokeWidth={1.8} />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-ink-3 hover:bg-red-50 hover:text-red-600"
+                aria-label={`Delete ${client.name}`}
+                onClick={() => setConfirmOpen(true)}
+              >
+                <Trash2 size={16} strokeWidth={1.8} />
+              </Button>
+            </div>
           </td>
         ) : null}
       </tr>
+
+      <NewClientModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        entityId={clientId}
+        initialData={client}
+      />
 
       <ConfirmDialog
         open={confirmOpen}
