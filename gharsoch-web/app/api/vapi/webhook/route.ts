@@ -1,3 +1,4 @@
+import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 
 import type { AgentRunContext } from '@/lib/runAgent'
@@ -20,6 +21,48 @@ type ParsedWebhookPayload = {
   type: string
   toolCalls: VapiToolCall[]
   callId?: string
+}
+
+function safeCompare(a: string, b: string) {
+  const aBuffer = Buffer.from(a)
+  const bBuffer = Buffer.from(b)
+  return aBuffer.length === bBuffer.length && crypto.timingSafeEqual(aBuffer, bBuffer)
+}
+
+function validateVapiSignature(request: NextRequest, rawBody: string) {
+  const secret = process.env.VAPI_WEBHOOK_SECRET
+  const signature = request.headers.get('x-vapi-signature')
+
+  if (secret && signature) {
+    const expectedHex = crypto.createHmac('sha256', secret).update(rawBody).digest('hex')
+    const expectedB64 = crypto.createHmac('sha256', secret).update(rawBody).digest('base64')
+    const sigStripped = signature.trim().replace(/^sha256=/, '')
+    const matchesHex = safeCompare(sigStripped, expectedHex)
+    const matchesB64 = safeCompare(sigStripped, expectedB64)
+
+    if (!matchesHex && !matchesB64) {
+      console.error('[VAPI WEBHOOK] Signature mismatch — rejecting request')
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+    }
+
+    return null
+  }
+
+  if (secret && !signature) {
+    console.warn('[VAPI WEBHOOK] VAPI_WEBHOOK_SECRET set but no x-vapi-signature header. Accepting request — disable this once Vapi sends signatures.')
+    return null
+  }
+
+  if (!secret && signature) {
+    console.warn('[VAPI WEBHOOK] x-vapi-signature header present but VAPI_WEBHOOK_SECRET unset. Configure secret to enable validation.')
+    return null
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    console.warn('[VAPI WEBHOOK] No signature validation — VAPI_WEBHOOK_SECRET unset')
+  }
+
+  return null
 }
 
 function normalizeType(payload: any) {
@@ -120,16 +163,8 @@ export async function POST(request: NextRequest) {
   try {
     const rawBody = await request.text()
 
-    // TODO Phase 12: Vapi webhook signature validation
-    // Steps when ready:
-    //   1. Generate secret: openssl rand -hex 32
-    //   2. Add VAPI_WEBHOOK_SECRET to .env (local) and Azure App Service env (prod)
-    //   3. Set in Vapi dashboard: Settings → Server URL Secret (org-level), OR
-    //      PATCH each assistant via Vapi API: { serverUrlSecret: "<value>" }
-    //   4. Re-enable HMAC-SHA256(rawBody, secret) === x-vapi-signature header
-    if (process.env.NODE_ENV === 'production') {
-      console.warn('[VAPI WEBHOOK] Signature validation DISABLED — Phase 12 deferral')
-    }
+    const signatureError = validateVapiSignature(request, rawBody)
+    if (signatureError) return signatureError
 
     const parsed = parseWebhookPayload(rawBody)
     const toolNames = summarizeToolCalls(parsed.toolCalls)

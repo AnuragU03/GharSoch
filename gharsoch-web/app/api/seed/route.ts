@@ -3,6 +3,8 @@ import { getCollection } from '@/lib/mongodb'
 import { SEED_PROPERTIES } from '@/data/propertySeed'
 import { authErrorResponse, requireRole } from '@/lib/auth'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     await requireRole(['admin', 'tech'])

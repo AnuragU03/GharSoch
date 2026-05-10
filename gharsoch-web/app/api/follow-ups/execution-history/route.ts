@@ -8,6 +8,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { agentLogger } from '@/lib/agentLogger'
 import { authErrorResponse, requireSession } from '@/lib/auth'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     await requireSession()
