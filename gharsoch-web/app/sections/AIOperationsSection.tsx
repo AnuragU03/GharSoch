@@ -7,6 +7,7 @@ import { RunDetailDrawer } from '@/components/RunDetailDrawer'
 import { StatStrip } from '@/components/StatStrip'
 import { SystemMap } from '@/components/SystemMap'
 import { LiveActivityFeed } from '@/components/LiveActivityFeed'
+import { CostsTab } from '@/components/CostsTab'
 import type {
   AgentDashboardRun,
   AgentDashboardSummary,
@@ -131,6 +132,7 @@ export function AIOperationsSection({
   const [activeTab, setActiveTab] = useState<'agents' | 'activity' | 'system' | 'costs'>('agents')
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [expandedAgentId, setExpandedAgentId] = useState<string | null>(null)
   const { can } = useUserRole()
 
   const summaryMap = new Map(summaries.map((summary) => [summary.agent_id, summary]))
@@ -210,6 +212,8 @@ export function AIOperationsSection({
                     summary={summary}
                     run={run}
                     liveLabel={agent.id === 'voice_orchestrator' ? 'Awaiting voice session' : undefined}
+                    isExpanded={expandedAgentId === agent.id}
+                    onToggle={() => setExpandedAgentId((prev) => prev === agent.id ? null : agent.id)}
                     onOpenRun={(runId) => {
                       setSelectedRunId(runId)
                       setDrawerOpen(true)
@@ -219,7 +223,16 @@ export function AIOperationsSection({
               })}
             </div>
 
-            <SystemMap />
+            <SystemMap 
+              agents={allAgents.map(a => ({ id: a.id, name: a.name, triggerLabel: a.triggerLabel }))} 
+              onNodeClick={(agentId) => {
+                const run = runMap.get(agentId)
+                if (run?.run_id) {
+                  setSelectedRunId(run.run_id)
+                  setDrawerOpen(true)
+                }
+              }} 
+            />
           </>
         ) : null}
 
@@ -227,7 +240,7 @@ export function AIOperationsSection({
           <LiveActivityFeed initialRuns={recentRuns} showFilterChips={true} showPauseButton={true} />
         ) : null}
         {activeTab === 'system' ? tabPanel('System map') : null}
-        {activeTab === 'costs' ? tabPanel('Costs') : null}
+        {activeTab === 'costs' ? <CostsTab /> : null}
       </section>
 
       <RunDetailDrawer

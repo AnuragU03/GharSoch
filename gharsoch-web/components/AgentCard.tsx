@@ -189,10 +189,11 @@ export function AgentCard({
   run?: AgentDashboardRun | null
   onOpenRun: (runId: string) => void
   liveLabel?: string
+  isExpanded: boolean
+  onToggle: () => void
 }) {
   const router = useRouter()
   const { can } = useUserRole()
-  const [expanded, setExpanded] = useState(false)
   const [isForceRunPending, startForceRunTransition] = useTransition()
   const [liveStatus, setLiveStatus] = useState<string | null>(null)
   const [pulseActive, setPulseActive] = useState(false)
@@ -357,14 +358,14 @@ export function AgentCard({
 
   return (
     <article
-      className={`agent${expanded ? ' expanded' : ''}`}
-      onClick={() => setExpanded((current) => !current)}
+      className={`agent${isExpanded ? ' expanded' : ''}`}
+      onClick={onToggle}
       role="button"
       tabIndex={0}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
-          setExpanded((current) => !current)
+          onToggle()
         }
       }}
     >
