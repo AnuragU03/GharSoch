@@ -177,6 +177,8 @@ export function AgentCard({
   run,
   onOpenRun,
   liveLabel,
+  isExpanded,
+  onToggle,
 }: {
   id: string
   name: string
