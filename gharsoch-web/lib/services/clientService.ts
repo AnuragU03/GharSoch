@@ -53,7 +53,9 @@ export const clientService = {
     const db = mongo.db(DB_NAME);
     const collection = db.collection<Client>(COLLECTION);
 
-    const query: any = {};
+    const query: any = {
+      deleted_at: { $exists: false }, // X2: hide soft-deleted clients
+    };
     if (options.status) query.conversion_status = options.status;
     if (options.source) query.source = options.source;
 
@@ -61,5 +63,13 @@ export const clientService = {
       .sort({ created_at: -1 })
       .limit(options.limit || 50)
       .toArray();
-  }
+  },
+
+  async deleteClient(id: string): Promise<void> {
+    const mongo = await clientPromise;
+    const db = mongo.db(DB_NAME);
+    const collection = db.collection<Client>(COLLECTION);
+
+    await collection.deleteOne({ _id: new ObjectId(id) });
+  },
 };

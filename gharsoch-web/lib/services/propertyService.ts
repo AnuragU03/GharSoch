@@ -74,7 +74,9 @@ export const propertyService = {
     limit?: number
   } = {}): Promise<SerializedProperty[]> {
     const collection = await getCollection()
-    const filter: Record<string, any> = {}
+    const filter: Record<string, any> = {
+      deleted_at: { $exists: false }, // X2: hide soft-deleted properties
+    }
 
     if (options.status && options.status !== 'available') {
       filter.status =
@@ -174,5 +176,14 @@ export const propertyService = {
     const updated = await collection.findOne({ _id: existing._id })
     if (!updated) throw new Error('Property not found after update')
     return serializeProperty(updated)
+  },
+
+  async delete(id: string) {
+    const collection = await getCollection()
+    const result = await collection.deleteOne({ _id: new ObjectId(id) })
+    if (result.deletedCount === 0) {
+      throw new Error('Property not found or already deleted')
+    }
+    return { success: true }
   },
 }

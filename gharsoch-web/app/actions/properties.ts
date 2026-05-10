@@ -1,8 +1,10 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { ObjectId } from 'mongodb'
 
 import { requireRole } from '@/lib/auth'
+import { getCollection } from '@/lib/mongodb'
 import { propertyService } from '@/lib/services/propertyService'
 
 function parseAmenities(value: FormDataEntryValue | null) {
@@ -48,3 +50,34 @@ export async function savePropertyAction(formData: FormData) {
     return { success: false, error: error?.message || 'Failed to save property.' }
   }
 }
+
+export async function deletePropertyAction(propertyId: string) {
+  await requireRole(['admin', 'tech'])
+  if (!ObjectId.isValid(propertyId)) {
+    return { ok: false, error: 'Invalid property ID' }
+  }
+  try {
+    const col = await getCollection('properties')
+    const result = await col.updateOne(
+      { _id: new ObjectId(propertyId) },
+      {
+        $set: {
+          deleted_at: new Date(),
+          status: 'archived',
+          updated_at: new Date(),
+        },
+      }
+    )
+    if (result.matchedCount === 0) {
+      return { ok: false, error: 'Property not found' }
+    }
+    revalidatePath('/properties')
+    revalidatePath('/ai-operations')
+    return { ok: true }
+  } catch (err) {
+    console.error('[DELETE_PROPERTY]', err)
+    return { ok: false, error: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}
+
+export const updatePropertyAction = savePropertyAction

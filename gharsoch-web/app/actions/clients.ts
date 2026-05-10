@@ -1,10 +1,12 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { ObjectId } from 'mongodb';
 
 import { runClientLeadConverter } from '@/lib/agents/clientLeadConverter';
 import { runMatchmakerForLead } from '@/lib/agents/matchmaker';
 import { requireRole } from '@/lib/auth';
+import { getCollection } from '@/lib/mongodb';
 import { clientService } from '@/lib/services/clientService';
 
 export async function createClientAction(formData: FormData) {
@@ -60,5 +62,58 @@ export async function createClientAction(formData: FormData) {
   } catch (error: any) {
     console.error('Server action error:', error);
     return { success: false, error: 'Internal server error during client creation.' };
+  }
+}
+
+export async function updateClientAction(formData: FormData) {
+  await requireRole(['admin', 'tech']);
+  const id = formData.get('id') as string;
+  if (!id) return { success: false, error: 'Client ID is required.' };
+
+  const payload: any = {};
+  const fields = ['name', 'phone', 'email', 'source', 'property_type', 'budget_range', 'location_pref', 'notes', 'conversion_status'];
+
+  fields.forEach(field => {
+    const val = formData.get(field);
+    if (val !== null) payload[field] = val;
+  });
+
+  try {
+    await clientService.updateClient(id, payload);
+    revalidatePath('/clients');
+    revalidatePath('/ai-operations');
+    return { success: true };
+  } catch (error: any) {
+    console.error('Update client error:', error);
+    return { success: false, error: 'Failed to update client.' };
+  }
+}
+
+export async function deleteClientAction(clientId: string) {
+  await requireRole(['admin', 'tech']);
+  if (!ObjectId.isValid(clientId)) {
+    return { ok: false, error: 'Invalid client ID' };
+  }
+  try {
+    const col = await getCollection('clients');
+    const result = await col.updateOne(
+      { _id: new ObjectId(clientId) },
+      {
+        $set: {
+          deleted_at: new Date(),
+          status: 'archived',
+          updated_at: new Date(),
+        },
+      }
+    );
+    if (result.matchedCount === 0) {
+      return { ok: false, error: 'Client not found' };
+    }
+    revalidatePath('/clients');
+    revalidatePath('/ai-operations');
+    return { ok: true };
+  } catch (err) {
+    console.error('[DELETE_CLIENT]', err);
+    return { ok: false, error: err instanceof Error ? err.message : 'Unknown error' };
   }
 }
