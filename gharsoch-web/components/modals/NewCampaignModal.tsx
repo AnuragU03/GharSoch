@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 
 import { createCampaignAction } from '@/app/actions/campaigns'
@@ -36,6 +37,7 @@ export function NewCampaignModal({
   open: boolean
   onClose: () => void
 }) {
+  const router = useRouter()
   const [form, setForm] = useState(INITIAL_STATE)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -60,6 +62,7 @@ export function NewCampaignModal({
     }
 
     toast.success(intent === 'launch' ? 'Campaign launched · Conductor queued' : 'Campaign saved as draft')
+    router.refresh()
     onClose()
   }
 

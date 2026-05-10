@@ -1,7 +1,9 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
+import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
+import { useRouter } from 'next/navigation'
 import { Pause, Play, Plus } from 'lucide-react'
 
 import { launchCampaignAction, pauseCampaignAction, resumeCampaignAction } from '@/app/actions/campaigns'
@@ -43,6 +45,7 @@ export function CampaignsSection({
 }) {
   const [newOpen, setNewOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const router = useRouter()
   const { role } = useUserRole()
   const canAdd = role === 'admin' || role === 'tech'
 
@@ -61,6 +64,17 @@ export function CampaignsSection({
           toast.error('Campaign update failed')
         })
     })
+  }
+
+  const openCampaign = (id: string) => {
+    router.push(`/campaigns/${id}`)
+  }
+
+  const openCampaignOnKeyDown = (event: React.KeyboardEvent<HTMLElement>, id: string) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      openCampaign(id)
+    }
   }
 
   return (
@@ -106,9 +120,14 @@ export function CampaignsSection({
             activeCampaigns.map((campaign, index) => (
               <div
                 key={campaign._id}
+                role="link"
+                tabIndex={0}
+                onClick={() => openCampaign(campaign._id)}
+                onKeyDown={(event) => openCampaignOnKeyDown(event, campaign._id)}
                 style={{
                   padding: '16px 18px',
                   borderBottom: index < activeCampaigns.length - 1 ? '1px solid var(--hairline)' : 'none',
+                  cursor: 'pointer',
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14 }}>
@@ -121,12 +140,28 @@ export function CampaignsSection({
                   <div className="flex items-center gap-2">
                     <Pill variant={statusPill(campaign.status)}>{campaign.status}</Pill>
                     {String(campaign.status || '').toLowerCase() === 'paused' ? (
-                      <button className="btn sm" type="button" disabled={isPending} onClick={() => mutateCampaign('resume', campaign._id)}>
+                      <button
+                        className="btn sm"
+                        type="button"
+                        disabled={isPending}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          mutateCampaign('resume', campaign._id)
+                        }}
+                      >
                         <Play size={12} strokeWidth={1.8} /> Resume
                       </button>
                     ) : null}
                     {String(campaign.status || '').toLowerCase() !== 'paused' ? (
-                      <button className="btn sm" type="button" disabled={isPending} onClick={() => mutateCampaign('pause', campaign._id)}>
+                      <button
+                        className="btn sm"
+                        type="button"
+                        disabled={isPending}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          mutateCampaign('pause', campaign._id)
+                        }}
+                      >
                         <Pause size={12} strokeWidth={1.8} /> Pause
                       </button>
                     ) : null}
@@ -167,9 +202,22 @@ export function CampaignsSection({
               </tr>
             ) : (
               [...draftCampaigns, ...completedCampaigns].map((campaign) => (
-                <tr key={campaign._id}>
+                <tr
+                  key={campaign._id}
+                  role="link"
+                  tabIndex={0}
+                  onClick={() => openCampaign(campaign._id)}
+                  onKeyDown={(event) => openCampaignOnKeyDown(event, campaign._id)}
+                  style={{ cursor: 'pointer' }}
+                >
                   <td>
-                    <div className="name">{campaign.name}</div>
+                    <Link
+                      href={`/campaigns/${campaign._id}`}
+                      className="name"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      {campaign.name}
+                    </Link>
                     <div className="meta">script: {campaign.script_template}</div>
                   </td>
                   <td>{campaign.target_lead_ids?.length || 0} leads</td>
@@ -177,7 +225,15 @@ export function CampaignsSection({
                     <div className="flex items-center gap-2">
                       <Pill variant={statusPill(campaign.status)}>{campaign.status}</Pill>
                       {campaign.status === 'draft' ? (
-                        <button className="btn sm" type="button" disabled={isPending} onClick={() => mutateCampaign('launch', campaign._id)}>
+                        <button
+                          className="btn sm"
+                          type="button"
+                          disabled={isPending}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            mutateCampaign('launch', campaign._id)
+                          }}
+                        >
                           <Play size={12} strokeWidth={1.8} /> Launch
                         </button>
                       ) : null}
