@@ -1,4 +1,5 @@
 import { runAgent } from '@/lib/runAgent';
+import { leadHasRecentOutboundCall } from '@/lib/services/callService';
 import { ObjectId } from 'mongodb';
 
 export async function runMatchmaker(leadId?: string): Promise<any> {
@@ -178,6 +179,24 @@ Only include pairs with score ≥ 75. If none qualify, return {"matches":[]}.`,
         const lead = (unmatchedLeads as any[]).find((l) => String(l._id) === match.client_id);
 
         if (lead?.phone) {
+          const cooldownMins = parseInt(process.env.OUTBOUND_COOLDOWN_MINUTES || '240');
+          if (await leadHasRecentOutboundCall(clientObjId, cooldownMins)) {
+            await ctx.act('cooldown_skip', `Skipping outbound call for ${lead.name || match.client_id}`, {
+              parameters: {
+                lead_id: clientObjId.toString(),
+                reason: `Lead contacted within ${cooldownMins}m cooldown window`,
+              },
+            });
+            match_details.push({
+              client_id: match.client_id,
+              property_id: match.property_id,
+              score: match.score,
+              status: 'cooldown_skipped',
+              reason: `Lead contacted within ${cooldownMins}m cooldown window`,
+            });
+            continue;
+          }
+
           const vapiResult = await ctx.vapi.triggerCampaignCall(
             {
               phone: lead.phone,

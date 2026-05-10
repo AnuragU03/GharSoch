@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runAgent } from '@/lib/runAgent'
+import { leadHasRecentOutboundCall } from '@/lib/services/callService'
+import { ObjectId } from 'mongodb'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,6 +75,7 @@ export async function POST(request: NextRequest) {
 
         for (const lead of batch) {
           const leadId = String(lead._id)
+          const leadObjectId = new ObjectId(leadId)
 
           // Fetch the last call transcript for this lead (most recent call first)
           const lastCallResults = await ctx.db.findMany('calls', {
@@ -114,6 +117,23 @@ export async function POST(request: NextRequest) {
             parameters: { lead_id: leadId, has_transcript: !!transcriptSnippet },
             result: { context_preview: reEngageContext.slice(0, 120) },
           })
+
+          const cooldownMins = parseInt(process.env.OUTBOUND_COOLDOWN_MINUTES || '240')
+          if (await leadHasRecentOutboundCall(leadObjectId, cooldownMins)) {
+            await ctx.act('cooldown_skip', `Skipping re-engagement call for ${lead.name}`, {
+              parameters: {
+                lead_id: leadId,
+                reason: `Lead contacted within ${cooldownMins}m cooldown window`,
+              },
+            })
+            lead_details.push({
+              lead_id: leadId,
+              lead_name: lead.name,
+              status: 'cooldown_skipped',
+              reason: `Lead contacted within ${cooldownMins}m cooldown window`,
+            })
+            continue
+          }
 
           // Trigger Vapi outbound call via ctx.vapi
           const result = await ctx.vapi.triggerCampaignCall(

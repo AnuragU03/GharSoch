@@ -8,6 +8,7 @@
  */
 
 import { runAgent } from '@/lib/runAgent'
+import { leadHasRecentOutboundCall } from '@/lib/services/callService'
 import { ObjectId } from 'mongodb'
 import type { Campaign } from '@/models/Campaign'
 
@@ -295,11 +296,23 @@ export async function runCampaignConductor(
 
       for (const lead of batch) {
         const leadId = String((lead as any)._id)
+        const leadObjectId = new ObjectId(leadId)
 
         // Skip DND leads
         if ((lead as any).dnd_status) {
           await ctx.act('lead_skipped_dnd', `Skipping DND lead ${leadId}`, {
             parameters: { lead_id: leadId },
+          })
+          continue
+        }
+
+        const cooldownMins = parseInt(process.env.OUTBOUND_COOLDOWN_MINUTES || '240')
+        if (await leadHasRecentOutboundCall(leadObjectId, cooldownMins)) {
+          await ctx.act('cooldown_skip', `Skipping campaign call for lead ${leadId}`, {
+            parameters: {
+              lead_id: leadId,
+              reason: `Lead contacted within ${cooldownMins}m cooldown window`,
+            },
           })
           continue
         }

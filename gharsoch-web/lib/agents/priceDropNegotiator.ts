@@ -1,4 +1,5 @@
 import { runAgent } from '@/lib/runAgent'
+import { leadHasRecentOutboundCall } from '@/lib/services/callService'
 import { ObjectId } from 'mongodb'
 
 type PriceDropInput = {
@@ -95,6 +96,25 @@ export async function runPriceDropNegotiator(input: PriceDropInput) {
 
       for (const lead of batch) {
         const leadId = String(lead._id)
+        const leadObjectId = new ObjectId(leadId)
+        const cooldownMins = parseInt(process.env.OUTBOUND_COOLDOWN_MINUTES || '240')
+
+        if (await leadHasRecentOutboundCall(leadObjectId, cooldownMins)) {
+          await ctx.act('cooldown_skip', `Skipping price-drop call for ${lead.name}`, {
+            parameters: {
+              lead_id: leadId,
+              reason: `Lead contacted within ${cooldownMins}m cooldown window`,
+            },
+          })
+          lead_details.push({
+            lead_id: leadId,
+            lead_name: lead.name,
+            status: 'cooldown_skipped',
+            reason: `Lead contacted within ${cooldownMins}m cooldown window`,
+          })
+          continue
+        }
+
         const result = await ctx.vapi.triggerCampaignCall(
           {
             phone: lead.phone,

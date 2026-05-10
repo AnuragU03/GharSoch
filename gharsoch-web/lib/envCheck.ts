@@ -60,6 +60,10 @@ export interface ValidateEnvOpts {
 export async function validateEnv(opts?: ValidateEnvOpts): Promise<void> {
   if (!shouldValidateNow()) return
 
+  if (!process.env.OUTBOUND_COOLDOWN_MINUTES) {
+    process.env.OUTBOUND_COOLDOWN_MINUTES = '240'
+  }
+
   if (process.env.NODE_ENV === 'production' && !process.env.VAPI_WEBHOOK_SECRET) {
     console.warn('[BOOT] VAPI_WEBHOOK_SECRET not set — webhook signature validation disabled. Set VAPI_WEBHOOK_SECRET + configure on Vapi assistants to enable.')
   }

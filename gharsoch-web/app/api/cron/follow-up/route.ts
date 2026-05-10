@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runAgent } from '@/lib/runAgent'
+import { leadHasRecentOutboundCall } from '@/lib/services/callService'
+import { ObjectId } from 'mongodb'
 
 export const dynamic = 'force-dynamic'
 
@@ -71,6 +73,23 @@ export async function GET(request: NextRequest) {
             confidence: 0.95,
             metadata: leadEvaluation,
           })
+
+          const cooldownMins = parseInt(process.env.OUTBOUND_COOLDOWN_MINUTES || '240')
+          if (await leadHasRecentOutboundCall(new ObjectId(leadEvaluation.lead_id), cooldownMins)) {
+            await ctx.act('cooldown_skip', `Skipping follow-up call for ${lead.name}`, {
+              parameters: {
+                lead_id: leadEvaluation.lead_id,
+                reason: `Lead contacted within ${cooldownMins}m cooldown window`,
+              },
+            })
+            lead_details.push({
+              lead_id: leadEvaluation.lead_id,
+              lead_name: lead.name,
+              status: 'cooldown_skipped',
+              reason: `Lead contacted within ${cooldownMins}m cooldown window`,
+            })
+            continue
+          }
 
           const result = await ctx.vapi.triggerCampaignCall(
             {

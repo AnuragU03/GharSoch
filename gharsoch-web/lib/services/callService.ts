@@ -112,6 +112,20 @@ async function getCollection() {
   return client.db(DB_NAME).collection<Call>(COLLECTION)
 }
 
+export async function leadHasRecentOutboundCall(leadId: ObjectId, withinMinutes = 240): Promise<boolean> {
+  if (withinMinutes <= 0) return false
+
+  const cutoff = new Date(Date.now() - withinMinutes * 60 * 1000)
+  const collection = await getCollection()
+  const count = await collection.countDocuments({
+    lead_id: { $in: [leadId, leadId.toString()] } as any,
+    direction: 'outbound',
+    created_at: { $gte: cutoff },
+  })
+
+  return count > 0
+}
+
 function extractToolName(run: any) {
   const input = run.input_data || {}
   const output = run.output_data || {}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCollection } from '@/lib/mongodb'
+import { leadHasRecentOutboundCall } from '@/lib/services/callService'
 import { triggerCampaignCall } from '@/lib/vapiClient'
 
 export const dynamic = 'force-dynamic'
@@ -38,6 +39,16 @@ export async function GET(request: NextRequest) {
 
     for (const lead of pendingFollowups) {
       console.log(`[Followup Cron] Triggering follow-up for lead ${lead.name} (${lead.phone})`)
+      const cooldownMins = parseInt(process.env.OUTBOUND_COOLDOWN_MINUTES || '240')
+      if (await leadHasRecentOutboundCall(lead._id, cooldownMins)) {
+        await agentLogsCollection.insertOne({
+          agent_name: 'The Follow-Up Agent',
+          action: `Cooldown skip for ${lead.name}: Lead contacted within ${cooldownMins}m cooldown window.`,
+          status: 'success',
+          created_at: new Date(),
+        })
+        continue
+      }
       
       const res = await triggerCampaignCall(
         {
