@@ -25,6 +25,16 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, error: 'Lead is on DNC list' }, { status: 403 })
       }
 
+      const cooldownMins = parseInt(process.env.OUTBOUND_COOLDOWN_MINUTES || '240')
+      if (await leadHasRecentOutboundCall(lead._id, cooldownMins)) {
+        return NextResponse.json({
+          success: false,
+          error: 'cooldown',
+          message: `Lead contacted within ${cooldownMins}m cooldown window`,
+          lead_id: lead._id.toString(),
+        }, { status: 429 })
+      }
+
       // Fetch premium properties for this lead's city to inject into Vapi memory
       const properties = await getCollection('properties')
       const matchingProperties = await properties.find({ 
