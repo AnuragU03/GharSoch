@@ -53,14 +53,17 @@ export function LeadCard({
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = draggableState
 
-  const style = transform ? { transform: CSS.Translate.toString(transform) } : undefined
+  const style = {
+    ...(transform ? { transform: CSS.Translate.toString(transform) } : {}),
+    opacity: isDragging && !dragging ? 0 : undefined,
+  }
   const secondaryTag = buildSecondaryTag(lead)
 
   return (
     <button
       ref={setNodeRef}
       type="button"
-      className={cn('lcard w-full text-left', (isDragging || dragging) && 'opacity-70 shadow-elev-1')}
+      className={cn('lcard w-full text-left', dragging && 'opacity-90 shadow-elev-1')}
       style={style}
       onClick={(e) => {
         e.preventDefault()
