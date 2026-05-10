@@ -56,11 +56,12 @@ function statusVariant(status?: string | null): PillVariant {
 }
 
 function formatTime(iso: string) {
-  return new Intl.DateTimeFormat('en-IN', {
+  return new Date(iso).toLocaleTimeString('en-IN', {
     timeZone: 'Asia/Kolkata',
-    hour: '2-digit',
+    hour: 'numeric',
     minute: '2-digit',
-  }).format(new Date(iso))
+    hour12: true,
+  })
 }
 
 function relativeTime(value?: string | null) {
@@ -266,15 +267,17 @@ function minutesUntil(iso: string) {
   const diff = new Date(iso).getTime() - Date.now()
   if (diff <= 0) return 'Now'
   const minutes = Math.round(diff / 60_000)
-  if (minutes < 60) return `In ${minutes} minutes`
-  const hours = Math.round(minutes / 60)
-  return `In ${hours} hour${hours === 1 ? '' : 's'}`
+  if (minutes < 60) return `in ${minutes}m`
+  if (minutes < 1440) return `in ${Math.round(minutes / 60)}h`
+  return null
 }
 
 function AppointmentHero({ appointment }: { appointment: DashboardAppointment }) {
   return (
     <div className="dash-appointment-hero">
-      <div className="dash-next-pill">{minutesUntil(appointment.scheduled_at)}</div>
+      {minutesUntil(appointment.scheduled_at) ? (
+        <div className="dash-next-pill">{minutesUntil(appointment.scheduled_at)}</div>
+      ) : null}
       <div className="dash-appointment-main">
         <div className="dash-time-chip">
           <strong>{formatTime(appointment.scheduled_at)}</strong>
@@ -293,7 +296,10 @@ function AppointmentHero({ appointment }: { appointment: DashboardAppointment })
 function AppointmentRow({ appointment }: { appointment: DashboardAppointment }) {
   return (
     <Link className="dash-compact-row" href="/appointments">
-      <span className="dash-mini-time">{formatTime(appointment.scheduled_at)}</span>
+      <span className="dash-mini-time">
+        {formatTime(appointment.scheduled_at)}
+        {minutesUntil(appointment.scheduled_at) ? <small> {minutesUntil(appointment.scheduled_at)}</small> : null}
+      </span>
       <span>
         <strong>{appointment.lead_name || 'Lead'}</strong>
         <span>{appointment.property_title || 'Property'}</span>
