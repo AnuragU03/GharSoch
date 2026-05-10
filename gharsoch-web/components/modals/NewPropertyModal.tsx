@@ -6,6 +6,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { savePropertyAction } from '@/app/actions/properties'
 import type { SerializedProperty } from '@/lib/services/propertyService'
 import { toast } from '@/lib/toast'
+import { getAgentVisual } from '@/lib/ui/agentVisuals'
 
 const TYPE_OPTIONS = ['1BHK', '2BHK', '3BHK', '4BHK', 'Villa']
 const STATUS_OPTIONS = [
@@ -58,6 +59,7 @@ export function NewPropertyModal({
   const [form, setForm] = useState<PropertyFormState>(buildInitialState(initialValues))
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const MatchmakerIcon = getAgentVisual('matchmaker').icon
 
   useEffect(() => {
     if (open) {
@@ -169,7 +171,10 @@ export function NewPropertyModal({
               </div>
 
               <div className="rounded-lg bg-warm-soft px-3 py-2 text-sm text-warm">
-                ✦ Matchmaker will scan unmatched leads on save. Lowering the price later dispatches the Price-Drop agent automatically.
+                <span className="inline-flex items-center gap-1.5">
+                  <MatchmakerIcon size={14} strokeWidth={1.75} />
+                  Matchmaker will scan unmatched leads on save. Lowering the price later dispatches the Price-Drop agent automatically.
+                </span>
               </div>
             </div>
 

@@ -8,19 +8,21 @@ import { StatStrip } from '@/components/StatStrip'
 import { SystemMap } from '@/components/SystemMap'
 import { LiveActivityFeed } from '@/components/LiveActivityFeed'
 import { CostsTab } from '@/components/CostsTab'
+import { getAgentVisual } from '@/lib/ui/agentVisuals'
 import type {
   AgentDashboardRun,
   AgentDashboardSummary,
   HealthStripData,
 } from '@/lib/services/agentDashboardService'
 import { useUserRole } from '@/lib/auth/useUserRole'
+import type { LucideIcon } from 'lucide-react'
 
 type AgentConfig = {
   id: string
   name: string
   purpose: string
   triggerLabel: string
-  icon: string
+  icon: LucideIcon
   iconVariant?: 'default' | 'green' | 'amber' | 'violet' | 'warm'
   callsLabel: string
 }
@@ -31,7 +33,7 @@ const AGENTS: AgentConfig[] = [
     name: 'The Matchmaker',
     purpose: 'Pairs fresh demand with active inventory and escalates the hottest pairings into outbound calls.',
     triggerLabel: 'Event / cron',
-    icon: '✦',
+    icon: getAgentVisual('matchmaker').icon,
     iconVariant: 'default',
     callsLabel: 'Matches',
   },
@@ -40,7 +42,7 @@ const AGENTS: AgentConfig[] = [
     name: 'The Follow-Up Agent',
     purpose: 'Reactivates scheduled follow-ups and pushes stalled buyers back into the conversation loop.',
     triggerLabel: 'Cron · hourly',
-    icon: '↻',
+    icon: getAgentVisual('follow_up_agent').icon,
     iconVariant: 'green',
     callsLabel: 'Calls',
   },
@@ -49,7 +51,7 @@ const AGENTS: AgentConfig[] = [
     name: 'The Appointment Guardian',
     purpose: 'Scans the next 24 hours of appointments and issues reminder calls before brokers lose the slot.',
     triggerLabel: 'Cron · 09:00 IST',
-    icon: '◷',
+    icon: getAgentVisual('appointment_guardian').icon,
     iconVariant: 'amber',
     callsLabel: 'Reminders',
   },
@@ -58,7 +60,7 @@ const AGENTS: AgentConfig[] = [
     name: 'The Dead Lead Re-engager',
     purpose: 'Finds cold or forgotten demand that still has signal and reopens the thread with a lighter touch.',
     triggerLabel: 'Cron · 10:00 IST',
-    icon: '↺',
+    icon: getAgentVisual('dead_lead_reengager').icon,
     iconVariant: 'violet',
     callsLabel: 'Re-engage',
   },
@@ -67,7 +69,7 @@ const AGENTS: AgentConfig[] = [
     name: 'The Price Drop Negotiator',
     purpose: 'Responds to property price events and resurfaces buyers whose objections were budget-driven.',
     triggerLabel: 'Event',
-    icon: '▿',
+    icon: getAgentVisual('price_drop_negotiator').icon,
     iconVariant: 'warm',
     callsLabel: 'Calls',
   },
@@ -78,7 +80,7 @@ const VOICE_ORCHESTRATOR: AgentConfig = {
   name: 'Voice Orchestrator',
   purpose: 'Routes Vapi tool-calls mid-call and keeps per-lead shared memory coherent across sessions.',
   triggerLabel: 'Live · Vapi webhook',
-  icon: '▶',
+  icon: getAgentVisual('voice_orchestrator').icon,
   iconVariant: 'default',
   callsLabel: 'Tool calls',
 }
@@ -153,7 +155,7 @@ export function AIOperationsSection({
       name: s.agent_id === 'client_lead_converter' ? 'Client → Lead Converter' : s.agent_id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
       purpose: s.agent_id === 'client_lead_converter' ? 'Qualifies raw clients into leads based on intent and missing data, then routes to Matchmaker.' : 'Dynamically discovered agent',
       triggerLabel: 'Event',
-      icon: '⚙',
+      icon: getAgentVisual(s.agent_id).icon,
       iconVariant: 'default' as const,
       callsLabel: 'Runs',
     }))

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
+import type { LucideIcon } from 'lucide-react'
 
 import { forceRunAgent } from '@/app/actions/agents'
 import { LivePulse } from '@/components/LivePulse'
@@ -184,7 +185,7 @@ export function AgentCard({
   name: string
   purpose: string
   triggerLabel: string
-  icon: string
+  icon: LucideIcon
   iconVariant?: 'default' | 'green' | 'amber' | 'violet' | 'warm'
   counters: Counter[]
   summary?: AgentDashboardSummary
@@ -196,6 +197,7 @@ export function AgentCard({
 }) {
   const router = useRouter()
   const { can } = useUserRole()
+  const Icon = icon
   const [isForceRunPending, startForceRunTransition] = useTransition()
   const [liveStatus, setLiveStatus] = useState<string | null>(null)
   const [pulseActive, setPulseActive] = useState(false)
@@ -376,7 +378,9 @@ export function AgentCard({
           <div className="agent-name">{name}</div>
           <div className="agent-purpose">{purpose}</div>
         </div>
-        <div className={`agent-icon${iconVariant !== 'default' ? ` ${iconVariant}` : ''}`}>{icon}</div>
+        <div className={`agent-icon${iconVariant !== 'default' ? ` ${iconVariant}` : ''}`}>
+          <Icon size={16} strokeWidth={1.75} className="text-current" />
+        </div>
       </div>
 
       <div className="agent-counters">
