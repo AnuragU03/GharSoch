@@ -3,6 +3,7 @@ import { getCollection } from '@/lib/mongodb'
 import { ObjectId } from 'mongodb'
 import { triggerCampaignCall } from '@/lib/vapiClient'
 import { authErrorResponse, requireRole } from '@/lib/auth'
+import { leadHasRecentOutboundCall } from '@/lib/services/callService'
 
 export async function POST(request: NextRequest) {
   try {
@@ -121,9 +122,20 @@ export async function POST(request: NextRequest) {
       )
 
       const results: { leadId: string; success: boolean; callId?: string; error?: string }[] = []
+      const cooldownSkips: { lead_id: string; reason: string }[] = []
+      const cooldownMins = parseInt(process.env.OUTBOUND_COOLDOWN_MINUTES || '240')
       const propertiesColl = await getCollection('properties')
+      const callsCol = await getCollection('calls')
 
       for (const lead of targetLeads) {
+        if (await leadHasRecentOutboundCall(lead._id, cooldownMins)) {
+          cooldownSkips.push({
+            lead_id: lead._id.toString(),
+            reason: `Lead contacted within ${cooldownMins}m cooldown window`,
+          })
+          continue
+        }
+
         // Fetch premium properties for this lead's city to inject into Vapi memory
         const matchingProperties = await propertiesColl.find({ 
           city: { $regex: new RegExp(`^${lead.place || 'Ahmedabad'}$`, 'i') },
@@ -162,6 +174,34 @@ export async function POST(request: NextRequest) {
             { _id: lead._id },
             { $set: { last_contacted_at: new Date(), updated_at: new Date() }, $inc: { total_calls: 1 } }
           )
+
+          const resultWithId = result as typeof result & { id?: string }
+          const vapiCallId = result.callId || resultWithId.id
+          if (vapiCallId) {
+            try {
+              await callsCol.insertOne({
+                lead_id: lead._id,
+                vapi_call_id: vapiCallId,
+                direction: 'outbound',
+                status: 'initiated',
+                customer_number: lead.phone,
+                agent_name: 'Campaign Conductor',
+                campaign_id: campaign._id,
+                triggered_by: 'campaign_bulk',
+                created_at: new Date(),
+                updated_at: new Date(),
+              })
+            } catch (err) {
+              console.error(
+                '[CAMPAIGNS BULK] Failed to log call to calls collection:',
+                (err as Error).message,
+                'lead_id:',
+                lead._id.toString(),
+                'vapi_call_id:',
+                vapiCallId
+              )
+            }
+          }
         }
 
         // 2 second delay between calls to avoid carrier throttling
@@ -177,6 +217,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         message: `${successCount}/${targetLeads.length} calls triggered`,
+        dialed: successCount,
+        skipped: cooldownSkips.length,
+        cooldown_skips: cooldownSkips,
         results,
       })
     }
