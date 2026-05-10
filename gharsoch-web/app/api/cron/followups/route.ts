@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
 
     const leadsCollection = await getCollection('leads')
     const agentLogsCollection = await getCollection('agent_logs')
+    const callsCol = await getCollection('calls')
     const now = new Date()
 
     // Find leads where next_follow_up_date is in the past, and not yet contacted for this follow-up
@@ -72,6 +73,26 @@ export async function GET(request: NextRequest) {
           { _id: lead._id },
           { $set: { next_follow_up_date: null, followup_reason: '' }, $inc: { follow_up_count: 1 } }
         )
+
+        const resWithId = res as typeof res & { id?: string }
+        const vapiCallId = res.callId || resWithId.id
+        if (vapiCallId) {
+          try {
+            await callsCol.insertOne({
+              lead_id: lead._id,
+              vapi_call_id: vapiCallId,
+              direction: 'outbound',
+              status: 'initiated',
+              customer_number: lead.phone,
+              agent_name: 'Follow-Up Agent',
+              triggered_by: 'cron_followup',
+              created_at: new Date(),
+              updated_at: new Date(),
+            })
+          } catch (err) {
+            console.error('[CRON FOLLOWUP] Failed to log call:', (err as Error).message, 'lead_id:', lead._id.toString())
+          }
+        }
       } else {
         console.error(`[Followup Cron] Failed to trigger call for ${lead.phone}: ${res.error}`)
       }
