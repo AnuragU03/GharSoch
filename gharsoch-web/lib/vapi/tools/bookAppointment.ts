@@ -40,15 +40,21 @@ export async function bookAppointmentTool(args: Record<string, any>, ctx: AgentR
   console.log('[BOOK_APPOINTMENT] Call context:', JSON.stringify({
     vapi_call_id: vapiCallId,
     lead_id_from_call: callRow?.lead_id?.toString?.() || callRow?.lead_id || null,
+    matched_property_id_from_call: callRow?.matched_property_id?.toString?.() || callRow?.matched_property_id || null,
   }))
 
   if (!callRow?.lead_id) {
     return { error: 'No lead context for this call. Cannot book appointment.' }
   }
 
-  const propertyIdRaw = args.property_id || args.propertyId
+  let propertyIdRaw = args.property_id || args.propertyId
+  if (!propertyIdRaw && callRow?.matched_property_id) {
+    propertyIdRaw = callRow.matched_property_id.toString()
+    console.log('[BOOK_APPOINTMENT] Using matched_property_id from call context:', propertyIdRaw)
+  }
+
   if (!propertyIdRaw || !ObjectId.isValid(String(propertyIdRaw))) {
-    return { error: 'Invalid or missing property_id' }
+    return { error: 'Invalid or missing property_id. AI did not provide one and no matched_property_id in call context.' }
   }
 
   const leadId = String(callRow.lead_id)

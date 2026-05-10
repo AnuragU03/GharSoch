@@ -112,18 +112,51 @@ async function getCollection() {
   return client.db(DB_NAME).collection<Call>(COLLECTION)
 }
 
-export async function leadHasRecentOutboundCall(leadId: ObjectId, withinMinutes = 240): Promise<boolean> {
-  if (withinMinutes <= 0) return false
+export async function phoneHasRecentOutboundCall(phone: string, withinMinutes = 240): Promise<boolean> {
+  if (!phone || withinMinutes <= 0) return false
 
   const cutoff = new Date(Date.now() - withinMinutes * 60 * 1000)
   const collection = await getCollection()
   const count = await collection.countDocuments({
+    direction: 'outbound',
+    created_at: { $gte: cutoff },
+    $or: [
+      { customer_number: phone } as any,
+      { to_number: phone } as any,
+      { lead_phone: phone } as any,
+    ],
+  })
+
+  return count > 0
+}
+
+export async function leadHasRecentOutboundCall(leadId: ObjectId, withinMinutes = 240): Promise<boolean> {
+  if (withinMinutes <= 0) return false
+
+  const cutoff = new Date(Date.now() - withinMinutes * 60 * 1000)
+  const callsCollection = await getCollection()
+  const leadCount = await callsCollection.countDocuments({
     lead_id: { $in: [leadId, leadId.toString()] } as any,
     direction: 'outbound',
     created_at: { $gte: cutoff },
   })
 
-  return count > 0
+  if (leadCount > 0) {
+    return true
+  }
+
+  const client = await clientPromise
+  const leadsCollection = client.db(DB_NAME).collection('leads')
+  const lead = await leadsCollection.findOne(
+    { _id: leadId },
+    { projection: { phone: 1 } }
+  )
+
+  if (lead?.phone) {
+    return phoneHasRecentOutboundCall(String(lead.phone), withinMinutes)
+  }
+
+  return false
 }
 
 function extractToolName(run: any) {
