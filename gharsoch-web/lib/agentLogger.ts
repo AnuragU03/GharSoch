@@ -2,6 +2,8 @@
  * Enhanced Agent Execution Logger
  * Tracks: input → reasoning steps → actions → results with full traceability
  * Stores in MongoDB collection: agent_execution_logs
+ *
+ * W2: All timestamps stored as BSON Date objects (not ISO strings).
  */
 
 import { v4 as uuidv4 } from 'uuid'
@@ -33,7 +35,7 @@ function sanitizeMongoKeys(value: any): any {
 }
 
 export interface ReasoningStep {
-  timestamp: string
+  timestamp: Date
   step_type: string
   content: string
   confidence?: number
@@ -41,7 +43,7 @@ export interface ReasoningStep {
 }
 
 export interface AgentAction {
-  timestamp: string
+  timestamp: Date
   action_type: string
   description: string
   parameters?: Record<string, any>
@@ -55,10 +57,10 @@ export interface AgentExecutionTrace {
   run_id: string
   agent_id: string
   agent_name: string
-  start_time: string
-  started_at: string
-  end_time?: string
-  completed_at?: string
+  start_time: Date
+  started_at: Date
+  end_time?: Date
+  completed_at?: Date
   execution_time_ms?: number
   status: 'started' | 'in_progress' | 'completed' | 'failed' | 'error' | 'success'
   input_data: Record<string, any>
@@ -73,7 +75,7 @@ export interface AgentExecutionTrace {
   summary_failed?: boolean
   summary_error?: string
   errors: Array<{
-    timestamp: string
+    timestamp: Date
     error_message: string
     error_type: string
     stack_trace?: string
@@ -85,26 +87,22 @@ export interface AgentExecutionTrace {
     max_tokens?: number
     [key: string]: any
   }
-  created_at: string
-  updated_at: string
+  created_at: Date
+  updated_at: Date
 }
 
 class AgentLogger {
   private currentRun: AgentExecutionTrace | null = null
   private collection: any = null
 
-  /**
-   * Initialize logger and get MongoDB collection
-   */
+  /** Initialize logger and get MongoDB collection */
   async initialize() {
     if (!this.collection) {
       this.collection = await getCollection('agent_execution_logs')
     }
   }
 
-  /**
-   * Start a new agent execution run
-   */
+  /** Start a new agent execution run */
   async startAgentRun(
     agent_id: string,
     agent_name: string,
@@ -114,7 +112,7 @@ class AgentLogger {
     await this.initialize()
 
     const run_id = uuidv4()
-    const now = new Date().toISOString()
+    const now = new Date() // W2: Date object, not ISO string
 
     this.currentRun = {
       run_id,
@@ -132,15 +130,11 @@ class AgentLogger {
       updated_at: now,
     }
 
-    // Persist to DB immediately
     await this.collection.insertOne(this.currentRun)
-
     return run_id
   }
 
-  /**
-   * Log a reasoning step during agent execution
-   */
+  /** Log a reasoning step during agent execution */
   async logAgentThinking(
     runId: string,
     step_type: ReasoningStep['step_type'],
@@ -151,7 +145,7 @@ class AgentLogger {
     await this.initialize()
 
     const reasoning_step: ReasoningStep = {
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(), // W2
       step_type,
       content,
       confidence,
@@ -162,7 +156,7 @@ class AgentLogger {
       { run_id: runId },
       {
         $push: { reasoning_steps: reasoning_step },
-        $set: { updated_at: new Date().toISOString() },
+        $set: { updated_at: new Date() }, // W2
       }
     )
 
@@ -171,9 +165,7 @@ class AgentLogger {
     }
   }
 
-  /**
-   * Log an agent action (tool-call, API request, database operation, etc.)
-   */
+  /** Log an agent action (tool-call, API request, database operation, etc.) */
   async logAgentAction(
     runId: string,
     action_type: string,
@@ -185,7 +177,7 @@ class AgentLogger {
     await this.initialize()
 
     const action: AgentAction = {
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(), // W2
       action_type,
       description,
       parameters: parameters ? sanitizeMongoKeys(parameters) : undefined,
@@ -198,7 +190,7 @@ class AgentLogger {
       { run_id: runId },
       {
         $push: { actions: action },
-        $set: { updated_at: new Date().toISOString() },
+        $set: { updated_at: new Date() }, // W2
       }
     )
 
@@ -207,9 +199,7 @@ class AgentLogger {
     }
   }
 
-  /**
-   * Log an error that occurred during execution
-   */
+  /** Log an error that occurred during execution */
   async logError(
     runId: string,
     error_message: string,
@@ -219,7 +209,7 @@ class AgentLogger {
     await this.initialize()
 
     const error_record = {
-      timestamp: new Date().toISOString(),
+      timestamp: new Date(), // W2
       error_message,
       error_type,
       stack_trace,
@@ -229,7 +219,7 @@ class AgentLogger {
       { run_id: runId },
       {
         $push: { errors: error_record },
-        $set: { status: 'error', updated_at: new Date().toISOString() },
+        $set: { status: 'error', updated_at: new Date() }, // W2
       }
     )
 
@@ -239,9 +229,7 @@ class AgentLogger {
     }
   }
 
-  /**
-   * Complete an agent execution run
-   */
+  /** Complete an agent execution run */
   async completeAgentRun(
     runId: string,
     output_data: Record<string, any>,
@@ -250,15 +238,17 @@ class AgentLogger {
   ): Promise<void> {
     await this.initialize()
 
-    const end_time = new Date().toISOString()
+    const end_time = new Date() // W2
 
-     // Best-effort execution time calculation if not provided by caller.
-     let computedExecutionTimeMs = executionTimeMs
-     if (computedExecutionTimeMs === undefined) {
-       const run = await this.collection.findOne({ run_id: runId }, { projection: { start_time: 1, created_at: 1 } })
-       const start = run?.start_time || run?.created_at
-       computedExecutionTimeMs = start ? Date.now() - Date.parse(start) : undefined
-     }
+    // Best-effort execution time calculation if not provided by caller.
+    let computedExecutionTimeMs = executionTimeMs
+    if (computedExecutionTimeMs === undefined) {
+      const run = await this.collection.findOne({ run_id: runId }, { projection: { start_time: 1, created_at: 1 } })
+      const start = run?.start_time || run?.created_at
+      computedExecutionTimeMs = start
+        ? Date.now() - (start instanceof Date ? start.getTime() : Date.parse(start))
+        : undefined
+    }
 
     await this.collection.updateOne(
       { run_id: runId },
@@ -269,7 +259,7 @@ class AgentLogger {
           end_time,
           completed_at: end_time,
           execution_time_ms: computedExecutionTimeMs,
-          updated_at: end_time,
+          updated_at: end_time, // W2
         },
       }
     )
@@ -297,7 +287,7 @@ class AgentLogger {
           reasoning_summary: sanitizedPayload,
           summary_failed: false,
           summary_error: null,
-          updated_at: new Date().toISOString(),
+          updated_at: new Date(), // W2
         },
       }
     )
@@ -318,7 +308,7 @@ class AgentLogger {
         $set: {
           summary_failed: true,
           summary_error: errorMessage,
-          updated_at: new Date().toISOString(),
+          updated_at: new Date(), // W2
         },
       }
     )
@@ -329,9 +319,7 @@ class AgentLogger {
     }
   }
 
-  /**
-   * Mark an agent run as failed (non-throwing helper for callers)
-   */
+  /** Mark an agent run as failed (non-throwing helper for callers) */
   async failAgentRun(
     runId: string,
     err: { message: string; type?: string; stack?: string },
@@ -339,7 +327,7 @@ class AgentLogger {
   ): Promise<void> {
     await this.initialize()
 
-    const end_time = new Date().toISOString()
+    const end_time = new Date() // W2
     const error_record = {
       timestamp: end_time,
       error_message: err.message,
@@ -356,7 +344,7 @@ class AgentLogger {
           end_time,
           completed_at: end_time,
           execution_time_ms: executionTimeMs,
-          updated_at: end_time,
+          updated_at: end_time, // W2
         },
       }
     )
@@ -370,17 +358,13 @@ class AgentLogger {
     }
   }
 
-  /**
-   * Retrieve execution trace for a specific run
-   */
+  /** Retrieve execution trace for a specific run */
   async getExecutionTrace(runId: string): Promise<AgentExecutionTrace | null> {
     await this.initialize()
     return await this.collection.findOne({ run_id: runId })
   }
 
-  /**
-   * Retrieve recent execution traces for an agent
-   */
+  /** Retrieve recent execution traces for an agent */
   async getAgentExecutionHistory(
     agent_id: string,
     limit: number = 20,
@@ -395,9 +379,7 @@ class AgentLogger {
       .toArray()
   }
 
-  /**
-   * Get execution traces by status
-   */
+  /** Get execution traces by status */
   async getExecutionsByStatus(
     status: string,
     limit: number = 50
@@ -410,9 +392,7 @@ class AgentLogger {
       .toArray()
   }
 
-  /**
-   * Calculate execution statistics for an agent
-   */
+  /** Calculate execution statistics for an agent */
   async getAgentStats(agent_id: string, days: number = 7): Promise<{
     total_runs: number
     successful_runs: number
@@ -429,7 +409,7 @@ class AgentLogger {
     const executions = await this.collection
       .find({
         agent_id,
-        created_at: { $gte: cutoff_date.toISOString() },
+        created_at: { $gte: cutoff_date }, // W2: compare Date to Date
       })
       .toArray()
 
@@ -466,9 +446,7 @@ class AgentLogger {
     }
   }
 
-  /**
-   * Clear current run context
-   */
+  /** Clear current run context */
   clearCurrentRun(): void {
     this.currentRun = null
   }
