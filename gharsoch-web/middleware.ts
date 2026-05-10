@@ -4,12 +4,16 @@ import { NextResponse } from 'next/server'
 
 const { auth } = NextAuth(authConfig)
 
-const ADMIN_ONLY_ROUTES = ['/ai-operations', '/agent-activity', '/settings/users']
+const ADMIN_ONLY_ROUTES = ['/ai-operations', '/settings/users']
 
 export default auth((req) => {
   const token = req.auth?.user
   const pathname = req.nextUrl.pathname
   const isApiRoute = pathname.startsWith('/api/')
+
+  if (pathname === '/agent-activity') {
+    return NextResponse.redirect(new URL('/ai-operations?tab=activity', req.nextUrl.origin))
+  }
 
   // 1. No token = unauthenticated
   if (!token) {

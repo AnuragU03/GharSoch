@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { RunDetailDrawer } from '@/components/RunDetailDrawer'
+import { useAgentEventStream } from '@/lib/hooks/useAgentEventStream'
 import type { AgentDashboardRun } from '@/lib/services/agentDashboardService'
 import { AgentTransitionTimeline } from '@/components/AgentTransitionTimeline'
 
@@ -45,6 +46,7 @@ export function LiveActivityFeed({
   const [paused, setPaused] = useState(false)
   const [liveEvents, setLiveEvents] = useState<any[]>([])
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
   const [visibleCount, setVisibleCount] = useState(20)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())

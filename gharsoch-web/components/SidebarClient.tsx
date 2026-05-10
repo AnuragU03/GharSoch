@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import {
-  Activity,
   BarChart3,
   BookOpen,
   Building2,
@@ -54,7 +53,6 @@ const WORK: NavItem[] = [
 
 const INTELLIGENCE: NavItem[] = [
   { href: '/ai-operations', label: 'AI Operations', icon: Sparkles },
-  { href: '/agent-activity', label: 'Agent Activity', icon: Activity },
   { href: '/kb', label: 'Knowledge Base', icon: BookOpen },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/settings/users', label: 'Users', icon: UserCog, badgeKey: 'pendingUsers' },

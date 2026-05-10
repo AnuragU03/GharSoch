@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { AgentCard } from '@/components/AgentCard'
 import { RunDetailDrawer } from '@/components/RunDetailDrawer'
@@ -125,17 +125,23 @@ export function AIOperationsSection({
   health,
   recentRuns,
   showVoiceOrchestrator = false,
+  initialTab = 'agents',
 }: {
   summaries: AgentDashboardSummary[]
   health: HealthStripData
   recentRuns: AgentDashboardRun[]
   showVoiceOrchestrator?: boolean
+  initialTab?: 'agents' | 'activity' | 'system' | 'costs'
 }) {
-  const [activeTab, setActiveTab] = useState<'agents' | 'activity' | 'system' | 'costs'>('agents')
+  const [activeTab, setActiveTab] = useState<'agents' | 'activity' | 'system' | 'costs'>(initialTab)
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [expandedAgentId, setExpandedAgentId] = useState<string | null>(null)
   const { can } = useUserRole()
+
+  useEffect(() => {
+    setActiveTab(initialTab)
+  }, [initialTab])
 
   const summaryMap = new Map(summaries.map((summary) => [summary.agent_id, summary]))
   const runMap = new Map<string, AgentDashboardRun>()
@@ -224,17 +230,6 @@ export function AIOperationsSection({
                 )
               })}
             </div>
-
-            <SystemMap 
-              agents={allAgents.map(a => ({ id: a.id, name: a.name, triggerLabel: a.triggerLabel }))} 
-              onNodeClick={(agentId) => {
-                const run = runMap.get(agentId)
-                if (run?.run_id) {
-                  setSelectedRunId(run.run_id)
-                  setDrawerOpen(true)
-                }
-              }} 
-            />
           </>
         ) : null}
 

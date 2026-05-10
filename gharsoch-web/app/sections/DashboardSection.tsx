@@ -187,7 +187,7 @@ function RecentActivityPanel({
     <div className="panel dash-panel">
       <div className="dash-panel-head">
         <div className="dash-panel-title">Recent agent activity</div>
-        <Link className="dash-panel-link" href="/agent-activity">View all activity →</Link>
+        <Link className="dash-panel-link" href="/ai-operations?tab=activity">View all activity →</Link>
       </div>
       <div className="dash-panel-body">
         {runs.length > 0 ? (

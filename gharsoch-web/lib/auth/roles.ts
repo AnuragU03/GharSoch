@@ -9,7 +9,6 @@ const BASE_NAV = [
   '/appointments',
   '/calls',
   '/ai-operations',
-  '/agent-activity',
   '/kb',
   '/analytics',
   '/settings',
@@ -17,7 +16,7 @@ const BASE_NAV = [
 
 const ADMIN_NAV = [...BASE_NAV, '/settings/users']
 
-// Brokers cannot see AI Ops or Agent Activity (full reasoning traces, system internals)
+// Brokers cannot see AI Ops (full reasoning traces, system internals)
 const BROKER_NAV = [
   '/',
   '/leads',
@@ -73,7 +72,7 @@ export function getDefaultLanding(role: Role): string {
     case 'admin':
       return '/'
     case 'tech':
-      return '/agent-activity'
+      return '/ai-operations'
     case 'broker':
       return '/leads'
   }

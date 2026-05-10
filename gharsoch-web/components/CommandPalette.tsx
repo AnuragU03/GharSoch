@@ -70,7 +70,7 @@ export function CommandPalette() {
           <CommandItem onSelect={() => navigate('/appointments')}>Appointments</CommandItem>
           <CommandItem onSelect={() => navigate('/calls')}>Call Logs</CommandItem>
           <CommandItem onSelect={() => navigate('/ai-operations')}>AI Operations</CommandItem>
-          <CommandItem onSelect={() => navigate('/agent-activity')}>Agent Activity</CommandItem>
+          <CommandItem onSelect={() => navigate('/ai-operations?tab=activity')}>Live Activity</CommandItem>
           <CommandItem onSelect={() => navigate('/kb')}>KB</CommandItem>
           <CommandItem onSelect={() => navigate('/analytics')}>Analytics</CommandItem>
           <CommandItem onSelect={() => navigate('/settings')}>Settings</CommandItem>
