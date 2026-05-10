@@ -9,9 +9,7 @@ export default function ClientProviders({ children }: { children: React.ReactNod
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
 
-  // During SSR/prerendering, render children directly without providers
-  if (!mounted) return <>{children}</>
-
+  // SessionProvider must be rendered during SSR to avoid useSession() hooks breaking the build
   return (
     <SessionProvider>
       <ErrorBoundary>
