@@ -35,6 +35,68 @@ function dateLabel(dateKey: string) {
   return new Intl.DateTimeFormat('en-IN', { weekday: 'long', day: 'numeric', month: 'short' }).format(d)
 }
 
+function dateKeyIst(value: Date | string) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(value))
+}
+
+function formatAppointmentTime(value: string) {
+  return new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(new Date(value))
+}
+
+function addMinutes(iso: string, minutes: number) {
+  return new Date(new Date(iso).getTime() + minutes * 60_000).toISOString()
+}
+
+function calendarDays(appointments: SerializedAppointment[]) {
+  const todayKey = dateKeyIst(new Date())
+  const start = new Date(todayKey + 'T00:00:00+05:30')
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(start)
+    date.setDate(start.getDate() + index)
+    const key = dateKeyIst(date)
+    return {
+      key,
+      label: index === 0 ? 'Today' : new Intl.DateTimeFormat('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }).format(date),
+      appointments: appointments.filter((appointment) => dateKeyIst(appointment.scheduled_at) === key),
+    }
+  })
+}
+
+function CalendarEvent({
+  appointment,
+  onClick,
+}: {
+  appointment: SerializedAppointment
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      className="w-full rounded-[10px] border border-hairline bg-surface-2 p-3 text-left transition hover:border-accent hover:bg-surface"
+      onClick={onClick}
+    >
+      <div className="text-[12px] font-semibold text-accent">
+        {formatAppointmentTime(appointment.scheduled_at)} – {formatAppointmentTime(addMinutes(appointment.scheduled_at, 30))}
+      </div>
+      <div className="mt-1 text-[13px] font-semibold text-ink">
+        {appointment.lead_name || 'Lead'} · {appointment.property_title || 'Property'}
+      </div>
+      <div className="mt-1 text-[11px] text-ink-3">🏠 {appointment.property_location || 'Location pending'}</div>
+    </button>
+  )
+}
+
 function AppointmentDetailDrawer({ detail, open, onClose }: { detail: AppointmentDetail | null; open: boolean; onClose: () => void }) {
   return (
     <Sheet open={open} onOpenChange={onClose}>
@@ -189,6 +251,7 @@ export function AppointmentsSection({
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [drawerDetail, setDrawerDetail] = useState<AppointmentDetail | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [view, setView] = useState<'list' | 'calendar'>('list')
 
   const handleRowClick = async (id: string) => {
     setDrawerDetail(null)
@@ -212,6 +275,8 @@ export function AppointmentsSection({
   ]
 
   const upcomingGrouped = groupByDate(upcomingAppts)
+  const calendarAppointments = [...todayAppts, ...upcomingAppts]
+  const days = calendarDays(calendarAppointments)
 
   return (
     <>
@@ -223,17 +288,62 @@ export function AppointmentsSection({
             <p className="sub">All scheduled, confirmed, and upcoming property visits in one place.</p>
           </div>
           <div className="actions">
-            <button type="button" className="btn ghost sm" title="Calendar view — coming in Phase 10 batch 3">
-              📅 Calendar view
+            <button
+              type="button"
+              className={`btn ghost sm${view === 'calendar' ? ' active' : ''}`}
+              title="Calendar view"
+              onClick={() => setView((current) => current === 'calendar' ? 'list' : 'calendar')}
+            >
+              📅 {view === 'calendar' ? 'List view' : 'Calendar view'}
             </button>
             <button type="button" className="btn primary" onClick={() => setModalOpen(true)}>
-              + Manual booking
+              🗓️ Manual booking
             </button>
           </div>
         </div>
 
         <StatStrip cells={stripCells} />
 
+        {view === 'calendar' ? (
+          <div className="panel">
+            <div className="panel-head">
+              <div>
+                <div className="panel-title">📅 Calendar view · next 7 days</div>
+                <div className="panel-sub">Click any appointment to open details.</div>
+              </div>
+            </div>
+            <div className="panel-body">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {days.map((day) => (
+                  <div key={day.key} className="rounded-[14px] border border-hairline bg-surface p-3">
+                    <div className="mb-3 flex items-center justify-between">
+                      <div className="text-[13px] font-semibold text-ink">{day.label}</div>
+                      <span className="count">{day.appointments.length}</span>
+                    </div>
+                    <div className="grid gap-2">
+                      {day.appointments.length > 0 ? (
+                        day.appointments.map((appointment) => (
+                          <CalendarEvent
+                            key={appointment._id}
+                            appointment={appointment}
+                            onClick={() => handleRowClick(appointment._id)}
+                          />
+                        ))
+                      ) : (
+                        <div className="rounded-[10px] border border-dashed border-hairline p-4 text-center text-[12px] text-ink-3">
+                          No visits
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {view === 'list' ? (
+          <>
         <div className="panel" style={{ marginBottom: 20 }}>
           <div className="panel-head">
             <div>
@@ -282,6 +392,8 @@ export function AppointmentsSection({
             )}
           </div>
         </div>
+          </>
+        ) : null}
       </section>
 
       <AppointmentDetailDrawer detail={drawerDetail} open={drawerOpen} onClose={() => setDrawerOpen(false)} />
