@@ -5,11 +5,9 @@ import { ObjectId } from 'mongodb'
 
 export const dynamic = 'force-dynamic'
 
-// Secure cron job execution
-// In production, this should be protected by an API key or cron secret.
-export async function GET(request: NextRequest) {
+async function handleFollowupCron(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization')
+    const authHeader = request.headers.get('authorization') || `Bearer ${request.headers.get('x-cron-secret')}`
     const cronSecret = process.env.CRON_SECRET
 
     if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
@@ -209,4 +207,12 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+export async function GET(request: NextRequest) {
+  return handleFollowupCron(request)
+}
+
+export async function POST(request: NextRequest) {
+  return handleFollowupCron(request)
 }

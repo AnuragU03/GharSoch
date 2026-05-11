@@ -18,9 +18,9 @@ function parseDateTime(args: Record<string, any>): Date {
 
   const preferredDate = args.preferred_date
   const preferredTime = String(args.preferred_time || args.time || '11:00')
+  let baseDate: Date | null = null
 
   if (preferredDate) {
-    let baseDate: Date | null = null
     const lower = String(preferredDate).toLowerCase().trim()
 
     if (lower === 'today') {
@@ -34,27 +34,48 @@ function parseDateTime(args: Record<string, any>): Date {
       if (!isNaN(parsed.getTime())) baseDate = parsed
     }
 
-    if (baseDate) {
-      // Parse preferred_time: "4pm", "16:00", "4:30 PM", "11"
-      const timeMatch = String(preferredTime).match(/(\d{1,2}):?(\d{0,2})\s*(am|pm)?/i)
-      if (timeMatch) {
-        let hours = parseInt(timeMatch[1])
-        const minutes = parseInt(timeMatch[2]) || 0
-        const ampm = (timeMatch[3] || '').toLowerCase()
+  }
 
-        if (ampm === 'pm' && hours < 12) hours += 12
-        if (ampm === 'am' && hours === 12) hours = 0
+  const relativeMatch = String(preferredTime).match(/^in\s+(\d+)\s*(min|minute|minutes|hr|hrs|hour|hours)/i)
+  if (relativeMatch) {
+    const amount = parseInt(relativeMatch[1], 10)
+    const unit = relativeMatch[2].toLowerCase()
+    const isHours = unit.startsWith('h')
+    const futureDate = new Date(Date.now() + amount * (isHours ? 60 : 1) * 60 * 1000)
+    console.log('[PARSE_DATE] Relative time:', amount, unit, '->', futureDate.toISOString())
+    return futureDate
+  }
 
-        // Convert IST to UTC: IST = UTC+5:30, so UTC = IST - 5:30
-        baseDate.setUTCHours(hours - 5, minutes - 30, 0, 0)
+  const bareRelativeMatch = String(preferredTime).match(/^(\d+)\s*(min|minute|minutes|hr|hrs|hour|hours)\s*(from\s+now|later)?$/i)
+  if (bareRelativeMatch) {
+    const amount = parseInt(bareRelativeMatch[1], 10)
+    const unit = bareRelativeMatch[2].toLowerCase()
+    const isHours = unit.startsWith('h')
+    const futureDate = new Date(Date.now() + amount * (isHours ? 60 : 1) * 60 * 1000)
+    console.log('[PARSE_DATE] Bare relative time:', amount, unit, '->', futureDate.toISOString())
+    return futureDate
+  }
 
-        // If result is in the past, push one day forward
-        if (baseDate < new Date()) {
-          baseDate = new Date(baseDate.getTime() + 24 * 60 * 60 * 1000)
-        }
+  if (baseDate) {
+    // Parse preferred_time: "4pm", "16:00", "4:30 PM", "11"
+    const timeMatch = String(preferredTime).match(/(\d{1,2}):?(\d{0,2})\s*(am|pm)?/i)
+    if (timeMatch) {
+      let hours = parseInt(timeMatch[1], 10)
+      const minutes = parseInt(timeMatch[2], 10) || 0
+      const ampm = (timeMatch[3] || '').toLowerCase()
 
-        return baseDate
+      if (ampm === 'pm' && hours < 12) hours += 12
+      if (ampm === 'am' && hours === 12) hours = 0
+
+      // Convert IST to UTC: IST = UTC+5:30, so UTC = IST - 5:30
+      baseDate.setUTCHours(hours - 5, minutes - 30, 0, 0)
+
+      // If result is in the past, push one day forward
+      if (baseDate < new Date()) {
+        baseDate = new Date(baseDate.getTime() + 24 * 60 * 60 * 1000)
       }
+
+      return baseDate
     }
   }
 

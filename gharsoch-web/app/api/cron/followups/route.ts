@@ -5,10 +5,9 @@ import { triggerCampaignCall } from '@/lib/vapiClient'
 
 export const dynamic = 'force-dynamic'
 
-// A simple endpoint to trigger any pending follow-up calls
-export async function GET(request: NextRequest) {
+async function handleFollowupsCron(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization')
+    const authHeader = request.headers.get('authorization') || `Bearer ${request.headers.get('x-cron-secret')}`
     const cronSecret = process.env.CRON_SECRET
 
     if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
@@ -110,4 +109,12 @@ export async function GET(request: NextRequest) {
     console.error('[Followup Cron] Error:', error)
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 })
   }
+}
+
+export async function GET(request: NextRequest) {
+  return handleFollowupsCron(request)
+}
+
+export async function POST(request: NextRequest) {
+  return handleFollowupsCron(request)
 }
