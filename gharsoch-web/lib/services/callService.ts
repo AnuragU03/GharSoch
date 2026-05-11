@@ -130,7 +130,25 @@ export async function phoneHasRecentOutboundCall(phone: string, withinMinutes = 
   return count > 0
 }
 
-export async function leadHasRecentOutboundCall(leadId: ObjectId, withinMinutes = 240): Promise<boolean> {
+export async function leadHasRecentOutboundCall(
+  leadId: ObjectId, 
+  withinMinutes = 240,
+  options?: { source?: 'matchmaker' | 'campaign' | 'follow_up_callback' | 'appointment_reminder' | 're_engager' }
+): Promise<boolean> {
+  const source = options?.source || 'matchmaker'
+
+  if (source === 'follow_up_callback' || source === 'appointment_reminder') {
+    const cutoff = new Date(Date.now() - 30 * 60 * 1000)
+    const callsCol = await getCollection()
+    const recentSameSource = await callsCol.countDocuments({
+      lead_id: { $in: [leadId, leadId.toString()] } as any,
+      direction: 'outbound',
+      call_type: source,
+      created_at: { $gte: cutoff }
+    })
+    return recentSameSource > 0
+  }
+
   if (withinMinutes <= 0) return false
 
   const cutoff = new Date(Date.now() - withinMinutes * 60 * 1000)

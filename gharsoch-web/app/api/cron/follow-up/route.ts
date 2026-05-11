@@ -73,7 +73,7 @@ async function handleFollowupCron(request: NextRequest) {
           })
 
           const cooldownMins = parseInt(process.env.OUTBOUND_COOLDOWN_MINUTES || '240')
-          if (await leadHasRecentOutboundCall(new ObjectId(leadEvaluation.lead_id), cooldownMins)) {
+          if (await leadHasRecentOutboundCall(new ObjectId(leadEvaluation.lead_id), cooldownMins, { source: 'follow_up_callback' })) {
             await ctx.act('cooldown_skip', `Skipping follow-up call for ${lead.name}`, {
               parameters: {
                 lead_id: leadEvaluation.lead_id,
@@ -119,7 +119,7 @@ async function handleFollowupCron(request: NextRequest) {
               agent_id: process.env.VAPI_ASSISTANT_REMINDER_ID || 'system',
               campaign_id: 'auto-follow-up',
               direction: 'outbound',
-              call_type: 'follow_up',
+              call_type: 'follow_up_callback',
               duration: 0,
               disposition: 'queued',
               call_outcome: 'pending',

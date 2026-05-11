@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
               agent_id: process.env.VAPI_ASSISTANT_REMINDER_ID || 'system',
               campaign_id: 'auto-reminders',
               direction: 'outbound',
-              call_type: 'reminder',
+              call_type: 'appointment_reminder',
               duration: 0,
               disposition: 'queued',
               call_outcome: 'pending',

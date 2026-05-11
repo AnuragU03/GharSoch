@@ -40,7 +40,7 @@ async function handleFollowupsCron(request: NextRequest) {
     for (const lead of pendingFollowups) {
       console.log(`[Followup Cron] Triggering follow-up for lead ${lead.name} (${lead.phone})`)
       const cooldownMins = parseInt(process.env.OUTBOUND_COOLDOWN_MINUTES || '240')
-      if (await leadHasRecentOutboundCall(lead._id, cooldownMins)) {
+      if (await leadHasRecentOutboundCall(lead._id, cooldownMins, { source: 'follow_up_callback' })) {
         await agentLogsCollection.insertOne({
           agent_name: 'The Follow-Up Agent',
           action: `Cooldown skip for ${lead.name}: Lead contacted within ${cooldownMins}m cooldown window.`,
@@ -82,6 +82,7 @@ async function handleFollowupsCron(request: NextRequest) {
               lead_id: lead._id,
               vapi_call_id: vapiCallId,
               direction: 'outbound',
+              call_type: 'follow_up_callback',
               status: 'initiated',
               customer_number: lead.phone,
               agent_name: 'Follow-Up Reminder',
