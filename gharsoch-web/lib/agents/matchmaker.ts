@@ -2,6 +2,11 @@ import { runAgent } from '@/lib/runAgent';
 import { leadHasRecentOutboundCall } from '@/lib/services/callService';
 import { ObjectId } from 'mongodb';
 
+export function normalizeLocation(loc?: string): string {
+  if (!loc) return '';
+  return loc.split(',')[0].toLowerCase().trim();
+}
+
 export async function runMatchmaker(leadId?: string): Promise<any> {
   const { runId, output } = await runAgent({
     agentId: 'matchmaker',
@@ -65,60 +70,104 @@ export async function runMatchmaker(leadId?: string): Promise<any> {
         };
       }
 
-      // Prepare slim payloads for GPT-4o (avoid sending raw Mongo docs)
-      const clientPayload = (unmatchedLeads as any[]).map((c) => ({
-        id: String(c._id),
-        name: c.name,
-        budget: c.budget_range,
-        location: c.location_pref,
-        type: c.property_type,
-        timeline: c.timeline,
-        notes: (c.notes || '').slice(0, 200),
-      }));
+      // Group leads by normalized location
+      const groups = new Map<string, any[]>();
+      let unmatchableLeads = 0;
+      
+      for (const lead of unmatchedLeads) {
+        const loc = normalizeLocation(lead.location_pref);
+        if (!loc) {
+          unmatchableLeads++;
+          console.warn(`[Matchmaker] Skipping lead ${lead._id} (${lead.name}) - empty location_pref`);
+          continue;
+        }
+        if (!groups.has(loc)) groups.set(loc, []);
+        groups.get(loc)!.push(lead);
+      }
 
-      const propertyPayload = (availableProperties as any[]).map((p) => ({
-        id: String(p._id),
-        title: p.title,
-        price: p.price,
-        location: p.location,
-        type: p.type,
-        bedrooms: p.bedrooms,
-      }));
+      let matches: Array<{ client_id: string; property_id: string; score: number; rationale: string }> = [];
+      let totalLeadsSent = 0;
+      let totalPropertiesSent = 0;
 
-      // ── GPT-4o pairing call via ctx.openai ─────────────────────────────
-      const gptResult = await ctx.openai.chat({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: `You are an expert real-estate matchmaker AI. Analyse the clients and properties below.
+      // Process each location group via OPTION 1
+      for (const [loc, groupLeads] of groups.entries()) {
+        const clientPayload = groupLeads.map((c) => ({
+          id: String(c._id),
+          name: c.name,
+          budget: c.budget_range,
+          location: c.location_pref,
+          type: c.property_type,
+          timeline: c.timeline,
+          notes: (c.notes || '').slice(0, 200),
+        }));
+
+        let groupProperties = availableProperties.filter(p => normalizeLocation(p.location) === loc);
+        let fallbackUsed = false;
+        
+        if (groupProperties.length === 0) {
+          // Fallback: send all properties
+          groupProperties = availableProperties;
+          fallbackUsed = true;
+        }
+
+        const propertyPayload = groupProperties.map((p) => ({
+          id: String(p._id),
+          title: p.title,
+          price: p.price,
+          location: p.location,
+          type: p.type,
+          bedrooms: p.bedrooms,
+        }));
+
+        totalLeadsSent += clientPayload.length;
+        totalPropertiesSent += propertyPayload.length;
+
+        const systemPrompt = fallbackUsed 
+          ? `You are an expert real-estate matchmaker AI. Analyse the clients and properties below.
+CRITICAL: Only match properties whose location matches the client's preferred location. If no exact-location match exists for a client, you may suggest a nearby property but you MUST cap the score at 50 and prefix the rationale with '[NEARBY MATCH] '.
 Return a JSON object with a single array "matches". Each element must have:
   - client_id  (string)
   - property_id (string)
   - score       (integer 1–100)
   - rationale   (string, ≤ 60 words)
-Only include pairs with score ≥ 75. If none qualify, return {"matches":[]}.`,
-          },
-          {
-            role: 'user',
-            content: JSON.stringify({ clients: clientPayload, properties: propertyPayload }),
-          },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.2,
-        max_tokens: 1200,
-      });
+Only include pairs with score ≥ 75. If none qualify, return {"matches":[]}.`
+          : `You are an expert real-estate matchmaker AI. Analyse the clients and properties below.
+CRITICAL: Only match properties whose location matches the client's preferred location.
+Return a JSON object with a single array "matches". Each element must have:
+  - client_id  (string)
+  - property_id (string)
+  - score       (integer 1–100)
+  - rationale   (string, ≤ 60 words)
+Only include pairs with score ≥ 75. If none qualify, return {"matches":[]}.`;
 
-      let matches: Array<{ client_id: string; property_id: string; score: number; rationale: string }> = [];
-      try {
-        const parsed = JSON.parse(gptResult.content);
-        matches = (parsed.matches || []).filter((m: any) => Number(m.score) >= 75);
-      } catch {
-        matches = [];
+        const gptResult = await ctx.openai.chat({
+          model: 'gpt-4o',
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt,
+            },
+            {
+              role: 'user',
+              content: JSON.stringify({ clients: clientPayload, properties: propertyPayload }),
+            },
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.2,
+          max_tokens: 1200,
+        });
+
+        try {
+          const parsed = JSON.parse(gptResult.content);
+          const groupMatches = (parsed.matches || []).filter((m: any) => Number(m.score) >= 75);
+          matches.push(...groupMatches);
+        } catch (err) {
+          console.error(`[Matchmaker] Failed to parse GPT output for location ${loc}:`, err);
+        }
       }
 
       await ctx.act('gpt4o_pairing_complete', `GPT-4o returned ${matches.length} qualifying match(es)`, {
-        parameters: { leads_sent: clientPayload.length, properties_sent: propertyPayload.length },
+        parameters: { leads_sent: totalLeadsSent, properties_sent: totalPropertiesSent, unmatchable_leads_skipped: unmatchableLeads },
         result: { matches_above_75: matches.length },
       });
 
