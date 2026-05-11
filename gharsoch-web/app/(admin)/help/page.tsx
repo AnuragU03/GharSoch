@@ -1,4 +1,7 @@
 import { PlatformShortcut } from '@/components/HelpNav'
+import { auth } from '@/lib/auth'
+
+export const dynamic = 'force-dynamic'
 
 const CAPABILITIES = [
   'Nine specialized AI agents qualify leads, match properties, protect appointments, and coordinate follow-ups.',
@@ -6,7 +9,8 @@ const CAPABILITIES = [
   'Compliance controls support TRAI windows, DND safeguards, IST business hours, and audit-friendly execution logs.',
 ]
 
-export default function HelpPage() {
+export default async function HelpPage() {
+  await auth()
   return (
     <section className="page active">
       <div className="crumb">System / Help</div>
