@@ -55,6 +55,29 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const leads = await getCollection('leads')
 
+    // B5: Dedup guard
+    if (body.phone) {
+      const normalizedPhone = body.phone.replace(/[^0-9+]/g, '');
+      const brokerId = process.env.DEFAULT_BROKER_ID;
+      const query: any = { phone: normalizedPhone, is_deleted: { $ne: true } };
+      if (brokerId) query.broker_id = brokerId;
+      
+      const existing = await leads.findOne(query);
+      if (existing) {
+        return NextResponse.json(
+          {
+            success: false,
+            reason: "duplicate_phone",
+            lead_id: existing._id,
+            lead_name: existing.name,
+            message: `A lead with this phone already exists (${existing.name}).`
+          },
+          { status: 409 }
+        );
+      }
+      body.phone = normalizedPhone;
+    }
+
     const lead = {
       ...DEFAULT_LEAD,
       ...body,

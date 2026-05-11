@@ -73,11 +73,21 @@ export default function LeadsSection() {
     const body = editingId ? { ...form, _id: editingId } : form
     
     const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    if ((await r.json()).success) { 
+    const data = await r.json()
+    if (data.success) { 
       setShowAdd(false); 
       setForm({ name: '', phone: '', email: '', source: '', budget_range: '', location_pref: '', property_type: '', notes: '', timeline: '', place: '', next_follow_up_date: '', followup_reason: '' }); 
       setEditingId(null);
       fetchLeads() 
+    } else if (r.status === 409 && data.reason === 'duplicate_phone') {
+      if (window.confirm(data.message + '\n\nClick OK to open this lead.')) {
+        setShowAdd(false)
+        setForm({ name: '', phone: '', email: '', source: '', budget_range: '', location_pref: '', property_type: '', notes: '', timeline: '', place: '', next_follow_up_date: '', followup_reason: '' })
+        setSearchFilter(form.phone)
+        fetchLeads()
+      }
+    } else {
+      alert(data.message || data.error || 'Failed to save lead');
     }
   }
 
