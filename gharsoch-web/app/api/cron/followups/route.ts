@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCollection } from '@/lib/mongodb'
 import { leadHasRecentOutboundCall } from '@/lib/services/callService'
 import { triggerReminderCall } from '@/lib/vapiClient'
+import { ObjectId } from 'mongodb'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,6 +58,19 @@ async function handleFollowupsCron(request: NextRequest) {
         process.env.VAPI_ASSISTANT_REMINDER_ID?.substring(0, 8),
       )
 
+      const propsCol = await getCollection('properties')
+
+      const priorCalls = await callsCol.find({
+        lead_id: lead._id,
+        direction: 'outbound',
+        matched_property_id: { $exists: true, $ne: null }
+      }).sort({ created_at: -1 }).limit(1).toArray()
+
+      const inheritedPropertyId = priorCalls[0]?.matched_property_id
+      const inheritedProperty = inheritedPropertyId 
+        ? await propsCol.findOne({ _id: new ObjectId(inheritedPropertyId.toString()) })
+        : null
+
       const res = await triggerReminderCall({
         phone: lead.phone,
         name: lead.name,
@@ -67,6 +81,9 @@ async function handleFollowupsCron(request: NextRequest) {
           location_pref: lead.location_pref || 'your preferred area',
           budget_range: lead.budget_range || '',
           prior_topic: lead.notes || 'properties you discussed earlier',
+          matched_property_id: inheritedPropertyId?.toString() || '',
+          matched_property_title: inheritedProperty?.title || '',
+          matched_property_location: inheritedProperty?.location || '',
         }
       })
 
@@ -84,11 +101,12 @@ async function handleFollowupsCron(request: NextRequest) {
           try {
             await callsCol.insertOne({
               lead_id: lead._id,
+              lead_phone: lead.phone,
               vapi_call_id: vapiCallId,
               direction: 'outbound',
               call_type: 'follow_up_callback',
+              matched_property_id: inheritedPropertyId || null,
               status: 'initiated',
-              customer_number: lead.phone,
               agent_name: 'Follow-Up Reminder',
               agent_id: process.env.VAPI_ASSISTANT_REMINDER_ID || 'system',
               triggered_by: 'cron_followup',

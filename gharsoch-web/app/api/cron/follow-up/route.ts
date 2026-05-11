@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { runAgent } from '@/lib/runAgent'
 import { leadHasRecentOutboundCall } from '@/lib/services/callService'
 import { ObjectId } from 'mongodb'
+import { getCollection } from '@/lib/mongodb'
 
 export const dynamic = 'force-dynamic'
 
@@ -96,6 +97,20 @@ async function handleFollowupCron(request: NextRequest) {
             process.env.VAPI_ASSISTANT_REMINDER_ID?.substring(0, 8),
           )
 
+          const callsCol = await getCollection('calls')
+          const propsCol = await getCollection('properties')
+
+          const priorCalls = await callsCol.find({
+            lead_id: lead._id,
+            direction: 'outbound',
+            matched_property_id: { $exists: true, $ne: null }
+          }).sort({ created_at: -1 }).limit(1).toArray()
+
+          const inheritedPropertyId = priorCalls[0]?.matched_property_id
+          const inheritedProperty = inheritedPropertyId 
+            ? await propsCol.findOne({ _id: new ObjectId(inheritedPropertyId.toString()) })
+            : null
+
           const result = await ctx.vapi.triggerReminderCall({
             phone: lead.phone,
             name: lead.name,
@@ -106,6 +121,9 @@ async function handleFollowupCron(request: NextRequest) {
               location_pref: lead.location_pref || 'your preferred area',
               budget_range: lead.budget_range || '',
               prior_topic: lead.notes || 'properties you discussed earlier',
+              matched_property_id: inheritedPropertyId?.toString() || '',
+              matched_property_title: inheritedProperty?.title || '',
+              matched_property_location: inheritedProperty?.location || '',
             }
           })
 
@@ -124,6 +142,7 @@ async function handleFollowupCron(request: NextRequest) {
               campaign_id: 'auto-follow-up',
               direction: 'outbound',
               call_type: 'follow_up_callback',
+              matched_property_id: inheritedPropertyId || null,
               duration: 0,
               disposition: 'queued',
               call_outcome: 'pending',
