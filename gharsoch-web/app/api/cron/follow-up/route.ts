@@ -89,21 +89,21 @@ async function handleFollowupCron(request: NextRequest) {
             continue
           }
 
-          const result = await ctx.vapi.triggerCampaignCall(
-            {
-              phone: lead.phone,
-              name: lead.name,
-              budget_range: lead.budget_range,
-              location_pref: lead.location_pref,
-              property_type: lead.property_type,
-              notes: lead.notes,
-            },
-            {
-              campaign_name: 'Automated Follow-Up',
-              script_template:
-                'Acknowledge the previous conversation and resume the discussion based on their notes.',
-            }
+          console.log(
+            '[FOLLOWUP CRON] Calling lead',
+            lead._id?.toString?.() || String(lead._id),
+            'with REMINDER assistant',
+            process.env.VAPI_ASSISTANT_REMINDER_ID?.substring(0, 8),
           )
+
+          const result = await ctx.vapi.triggerReminderCall({
+            _id: lead._id,
+            lead_phone: lead.phone,
+            lead_name: lead.name,
+            property_title: 'Follow-up reminder',
+            property_location: lead.location_pref || lead.budget_range || 'Existing conversation context',
+            scheduled_at: lead.next_follow_up_date || now,
+          })
 
           if (result.success) {
             await ctx.act('outbound_call_trigger', `Triggered follow-up call for ${lead.name}`, {
@@ -115,8 +115,8 @@ async function handleFollowupCron(request: NextRequest) {
               lead_id: leadEvaluation.lead_id,
               lead_name: lead.name,
               lead_phone: lead.phone,
-              agent_name: 'Arya Outbound',
-              agent_id: process.env.VAPI_ASSISTANT_OUTBOUND_ID || 'system',
+              agent_name: 'Follow-Up Reminder',
+              agent_id: process.env.VAPI_ASSISTANT_REMINDER_ID || 'system',
               campaign_id: 'auto-follow-up',
               direction: 'outbound',
               call_type: 'follow_up',

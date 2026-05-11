@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCollection } from '@/lib/mongodb'
 import { leadHasRecentOutboundCall } from '@/lib/services/callService'
-import { triggerCampaignCall } from '@/lib/vapiClient'
+import { triggerReminderCall } from '@/lib/vapiClient'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,20 +50,21 @@ async function handleFollowupsCron(request: NextRequest) {
         continue
       }
       
-      const res = await triggerCampaignCall(
-        {
-          name: lead.name,
-          phone: lead.phone,
-          notes: lead.notes,
-          budget_range: lead.budget_range,
-          location_pref: lead.location_pref,
-          property_type: lead.property_type
-        },
-        {
-          campaign_name: 'Automated Followup',
-          script_template: `This is an automated follow-up call. Context: ${lead.followup_reason || 'Touching base.'}`
-        }
+      console.log(
+        '[FOLLOWUP CRON] Calling lead',
+        lead._id?.toString?.() || String(lead._id),
+        'with REMINDER assistant',
+        process.env.VAPI_ASSISTANT_REMINDER_ID?.substring(0, 8),
       )
+
+      const res = await triggerReminderCall({
+        _id: lead._id,
+        lead_phone: lead.phone,
+        lead_name: lead.name,
+        property_title: 'Follow-up reminder',
+        property_location: lead.location_pref || lead.budget_range || 'Existing conversation context',
+        scheduled_at: lead.next_follow_up_date || now,
+      })
 
       if (res.success) {
         triggeredCount++
@@ -83,7 +84,8 @@ async function handleFollowupsCron(request: NextRequest) {
               direction: 'outbound',
               status: 'initiated',
               customer_number: lead.phone,
-              agent_name: 'Follow-Up Agent',
+              agent_name: 'Follow-Up Reminder',
+              agent_id: process.env.VAPI_ASSISTANT_REMINDER_ID || 'system',
               triggered_by: 'cron_followup',
               created_at: new Date(),
               updated_at: new Date(),
