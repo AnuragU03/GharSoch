@@ -58,12 +58,16 @@ async function handleFollowupsCron(request: NextRequest) {
       )
 
       const res = await triggerReminderCall({
-        _id: lead._id,
-        lead_phone: lead.phone,
-        lead_name: lead.name,
-        property_title: 'Follow-up reminder',
-        property_location: lead.location_pref || lead.budget_range || 'Existing conversation context',
-        scheduled_at: lead.next_follow_up_date || now,
+        phone: lead.phone,
+        name: lead.name,
+        variables: {
+          call_purpose: 'callback',
+          customer_name: lead.name || 'there',
+          property_type: lead.property_type || 'properties',
+          location_pref: lead.location_pref || 'your preferred area',
+          budget_range: lead.budget_range || '',
+          prior_topic: lead.notes || 'properties you discussed earlier',
+        }
       })
 
       if (res.success) {

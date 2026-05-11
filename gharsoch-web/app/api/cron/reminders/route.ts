@@ -4,6 +4,24 @@ import { ObjectId } from 'mongodb'
 
 export const dynamic = 'force-dynamic'
 
+function formatDateIST(d: Date): string {
+  return new Date(d).toLocaleDateString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long'
+  })
+}
+
+function formatTimeIST(d: Date): string {
+  return new Date(d).toLocaleTimeString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  })
+}
+
 /**
  * POST /api/cron/reminders
  * The Appointment Guardian — daily 09:00 IST
@@ -90,12 +108,16 @@ export async function POST(request: NextRequest) {
 
           // Trigger reminder call through ctx.vapi (auto-logged)
           const result = await ctx.vapi.triggerReminderCall({
-            _id: appt._id,
-            lead_name: lead.name,
-            lead_phone: lead.phone,
-            property_title: property.title,
-            property_location: property.location,
-            scheduled_at: appt.scheduled_at,
+            phone: lead.phone,
+            name: lead.name,
+            variables: {
+              call_purpose: 'appointment_reminder',
+              customer_name: lead.name || 'there',
+              property_title: property.title || 'the property',
+              property_location: property.location || 'the address we shared',
+              appointment_date: formatDateIST(appt.scheduled_at),
+              appointment_time: formatTimeIST(appt.scheduled_at),
+            }
           })
 
           if (result.success) {

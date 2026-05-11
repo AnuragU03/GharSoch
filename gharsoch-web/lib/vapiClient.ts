@@ -219,35 +219,21 @@ export async function triggerCampaignCall(lead: {
 /**
  * Trigger a reminder call for an appointment.
  */
-export async function triggerReminderCall(appointment: {
-  lead_phone: string
-  lead_name: string
-  property_title: string
-  property_location: string
-  scheduled_at: Date | string
-  _id?: any
+export async function triggerReminderCall(params: {
+  phone: string
+  name?: string
+  variables?: Record<string, string>
 }, opts?: { logHook?: VapiLogHook }): Promise<VapiCallResponse> {
   const assistantId = process.env.VAPI_ASSISTANT_REMINDER_ID
   if (!assistantId) {
     return { success: false, error: 'VAPI_ASSISTANT_REMINDER_ID not configured' }
   }
 
-  const scheduledDate = new Date(appointment.scheduled_at)
-  const dateStr = scheduledDate.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })
-  const timeStr = scheduledDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
-
   return triggerOutboundCall({
     assistantId,
-    customerPhone: appointment.lead_phone,
-    customerName: appointment.lead_name,
-    metadata: {
-      customer_name: appointment.lead_name,
-      property_title: appointment.property_title,
-      property_location: appointment.property_location,
-      appointment_date: dateStr,
-      appointment_time: timeStr,
-      appointment_id: appointment._id?.toString() || '',
-    },
+    customerPhone: params.phone,
+    customerName: params.name,
+    metadata: params.variables || {},
   }, opts)
 }
 
