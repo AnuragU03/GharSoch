@@ -246,7 +246,8 @@ Only include pairs with score ≥ 75. If none qualify, return {"matches":[]}.`;
             continue;
           }
 
-          const vapiResult = await ctx.vapi.triggerCampaignCall(
+          const vapiResult = process.env.IMMEDIATE_CALL_AFTER_MATCH === "true" 
+            ? await ctx.vapi.triggerCampaignCall(
             {
               phone: lead.phone,
               name: lead.name,
@@ -259,7 +260,8 @@ Only include pairs with score ≥ 75. If none qualify, return {"matches":[]}.`;
               campaign_name: 'Matchmaker Outbound',
               script_template: `We found a property that closely matches what you're looking for — ${matchedProperty?.title || 'a great option'} in ${matchedProperty?.location || lead.location_pref}. ${match.rationale} Would you like to schedule a visit?`,
             }
-          );
+          ) 
+          : { success: false, error: 'IMMEDIATE_CALL_AFTER_MATCH=false' };
 
           if (vapiResult.success) {
             await ctx.db.insertOne('calls', {
