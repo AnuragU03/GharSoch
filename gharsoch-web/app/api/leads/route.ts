@@ -4,6 +4,8 @@ import { ObjectId } from 'mongodb'
 import { DEFAULT_LEAD } from '@/models/Lead'
 import type { Lead } from '@/models/Lead'
 import { authErrorResponse, requireRole, requireSession } from '@/lib/auth'
+import { auth } from '@/lib/auth'
+import { requireBrokerId, BrokerScopeMissingError } from '@/lib/auth/requireBroker'
 
 export async function GET(request: NextRequest) {
   try {
@@ -51,6 +53,21 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     await requireRole(['admin', 'tech'])
+    const session = await auth()
+    
+    let brokerId: string;
+    try {
+      brokerId = requireBrokerId(session);
+    } catch (e) {
+      if (e instanceof BrokerScopeMissingError) {
+        return NextResponse.json(
+          { error: "broker_scope_missing", message: "Your account is not provisioned for a brokerage. Contact admin." },
+          { status: 403 }
+        );
+      }
+      throw e;
+    }
+
     // Phase 11.5: stamp lead with session.user.brokerage_id.
     const body = await request.json()
     const leads = await getCollection('leads')
@@ -58,7 +75,6 @@ export async function POST(request: NextRequest) {
     // B5: Dedup guard
     if (body.phone) {
       const normalizedPhone = body.phone.replace(/[^0-9+]/g, '');
-      const brokerId = process.env.DEFAULT_BROKER_ID;
       const query: any = { phone: normalizedPhone, is_deleted: { $ne: true } };
       if (brokerId) query.broker_id = brokerId;
       
@@ -81,6 +97,7 @@ export async function POST(request: NextRequest) {
     const lead = {
       ...DEFAULT_LEAD,
       ...body,
+      broker_id: brokerId,
       next_follow_up_date: body.next_follow_up_date ? new Date(body.next_follow_up_date) : null,
       created_at: new Date(),
       updated_at: new Date(),

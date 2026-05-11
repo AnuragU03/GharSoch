@@ -4,10 +4,26 @@ import { ObjectId } from 'mongodb'
 import { triggerCampaignCall } from '@/lib/vapiClient'
 import { authErrorResponse, requireRole } from '@/lib/auth'
 import { leadHasRecentOutboundCall } from '@/lib/services/callService'
+import { auth } from '@/lib/auth'
+import { requireBrokerId, BrokerScopeMissingError } from '@/lib/auth/requireBroker'
 
 export async function POST(request: NextRequest) {
   try {
     await requireRole(['admin', 'tech'])
+    const session = await auth()
+    
+    let brokerId: string;
+    try {
+      brokerId = requireBrokerId(session);
+    } catch (e) {
+      if (e instanceof BrokerScopeMissingError) {
+        return NextResponse.json(
+          { error: "broker_scope_missing", message: "Your account is not provisioned for a brokerage. Contact admin." },
+          { status: 403 }
+        );
+      }
+      throw e;
+    }
     // Phase 11.5: verify campaign/lead belongs to session.user.brokerage_id.
     const data = await request.json()
     const { campaignId, leadId } = data
