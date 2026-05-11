@@ -133,18 +133,19 @@ export async function phoneHasRecentOutboundCall(phone: string, withinMinutes = 
 export async function leadHasRecentOutboundCall(
   leadId: ObjectId, 
   withinMinutes = 240,
-  options?: { source?: 'matchmaker' | 'campaign' | 'follow_up_callback' | 'appointment_reminder' | 're_engager' }
+  options?: { source?: 'matchmaker' | 'campaign' | 'follow_up_callback' | 'appointment_reminder' | 're_engager'; floor?: Date }
 ): Promise<boolean> {
   const source = options?.source || 'matchmaker'
 
   if (source === 'follow_up_callback' || source === 'appointment_reminder') {
     const cutoff = new Date(Date.now() - 30 * 60 * 1000)
+    const effectiveCutoff = options?.floor && options.floor > cutoff ? options.floor : cutoff
     const callsCol = await getCollection()
     const recentSameSource = await callsCol.countDocuments({
       lead_id: { $in: [leadId, leadId.toString()] } as any,
       direction: 'outbound',
       call_type: source,
-      created_at: { $gte: cutoff }
+      created_at: { $gte: effectiveCutoff }
     })
     return recentSameSource > 0
   }
@@ -152,11 +153,12 @@ export async function leadHasRecentOutboundCall(
   if (withinMinutes <= 0) return false
 
   const cutoff = new Date(Date.now() - withinMinutes * 60 * 1000)
+  const effectiveCutoff = options?.floor && options.floor > cutoff ? options.floor : cutoff
   const callsCollection = await getCollection()
   const leadCount = await callsCollection.countDocuments({
     lead_id: { $in: [leadId, leadId.toString()] } as any,
     direction: 'outbound',
-    created_at: { $gte: cutoff },
+    created_at: { $gte: effectiveCutoff },
   })
 
   if (leadCount > 0) {
