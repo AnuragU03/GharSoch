@@ -108,15 +108,31 @@ export async function bookAppointmentTool(args: Record<string, any>, ctx: AgentR
     return { error: 'No lead context for this call. Cannot book appointment.' }
   }
 
-  // Resolve property_id: AI arg first, then matched_property_id from call context
+  // Resolve property_id: AI arg first, then title-based lookup, then matched_property_id from call context
   let propertyIdRaw = args.property_id || args.propertyId
+  
+  if (!propertyIdRaw && args.property_title) {
+    console.log('[BOOK_APPOINTMENT] No property_id, attempting title lookup for:', args.property_title);
+    const propertiesCol = await getCollection('properties');
+    const matchedProp = await propertiesCol.findOne({
+      $or: [
+        { title: { $regex: new RegExp(`^${args.property_title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
+        { title: { $regex: new RegExp(args.property_title.split(' ')[0], 'i') } }
+      ]
+    });
+    if (matchedProp?._id) {
+      propertyIdRaw = matchedProp._id.toString();
+      console.info('[BOOK_APPOINTMENT] Resolved property from title search:', propertyIdRaw, `(${matchedProp.title})`);
+    }
+  }
+
   if (!propertyIdRaw && callRow?.matched_property_id) {
     propertyIdRaw = callRow.matched_property_id.toString()
     console.log('[BOOK_APPOINTMENT] Using matched_property_id from call context:', propertyIdRaw)
   }
 
   if (!propertyIdRaw || !ObjectId.isValid(String(propertyIdRaw))) {
-    return { error: 'Invalid or missing property_id. AI did not provide one and no matched_property_id in call context.' }
+    return { error: 'Invalid or missing property_id. AI did not provide one, title search failed, and no matched_property_id in call context.' }
   }
 
   const leadId = String(callRow.lead_id)
