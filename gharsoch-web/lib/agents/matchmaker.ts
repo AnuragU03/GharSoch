@@ -101,13 +101,16 @@ export async function runMatchmaker(leadId?: string): Promise<any> {
           notes: (c.notes || '').slice(0, 200),
         }));
 
-        let groupProperties = availableProperties.filter(p => normalizeLocation(p.location) === loc);
-        let fallbackUsed = false;
-        
+        const groupProperties = availableProperties.filter(p => normalizeLocation(p.location) === loc);
         if (groupProperties.length === 0) {
-          // Fallback: send all properties
-          groupProperties = availableProperties;
-          fallbackUsed = true;
+          // B12 part 2: When no exact-location properties exist, do NOT fall back to nearby properties.
+          // GPT-4o ignored the prompt's "cap at 50" instruction and returned cross-location matches at score 80.
+          // Code-enforce: no exact match = no match. Brokers can manually match nearby properties if they want.
+          console.warn(
+            `[Matchmaker] No exact-location properties for "${loc}" — skipping ${groupLeads.length} lead(s), no GPT call made`
+          );
+          unmatchableLeads += groupLeads.length;
+          continue; // skip to next location group
         }
 
         const propertyPayload = groupProperties.map((p) => ({
@@ -122,16 +125,7 @@ export async function runMatchmaker(leadId?: string): Promise<any> {
         totalLeadsSent += clientPayload.length;
         totalPropertiesSent += propertyPayload.length;
 
-        const systemPrompt = fallbackUsed 
-          ? `You are an expert real-estate matchmaker AI. Analyse the clients and properties below.
-CRITICAL: Only match properties whose location matches the client's preferred location. If no exact-location match exists for a client, you may suggest a nearby property but you MUST cap the score at 50 and prefix the rationale with '[NEARBY MATCH] '.
-Return a JSON object with a single array "matches". Each element must have:
-  - client_id  (string)
-  - property_id (string)
-  - score       (integer 1–100)
-  - rationale   (string, ≤ 60 words)
-Only include pairs with score ≥ 75. If none qualify, return {"matches":[]}.`
-          : `You are an expert real-estate matchmaker AI. Analyse the clients and properties below.
+        const systemPrompt = `You are an expert real-estate matchmaker AI. Analyse the clients and properties below.
 CRITICAL: Only match properties whose location matches the client's preferred location.
 Return a JSON object with a single array "matches". Each element must have:
   - client_id  (string)
