@@ -103,11 +103,6 @@ export async function handleEndOfCallReport(payload: any, ctx: AgentRunContext) 
   const recordingUrl = extractRecordingUrl(payload)
   const { callId, assistantId, customerPhone, customerName, duration, endedReason } = extractCallData(payload)
 
-  // Z3: Analysis Extraction
-  const msg = payload?.message || payload || {}
-  const analysis = msg?.analysis || payload?.analysis || {}
-  const structuredData = analysis?.structuredData || {}
-
   await ctx.think(
     'evaluation',
     `Persisting end-of-call report for ${callId || 'unknown_call'} with transcript length ${transcript.length}.`
@@ -118,7 +113,7 @@ export async function handleEndOfCallReport(payload: any, ctx: AgentRunContext) 
   const leads = await ctx.db.findMany('leads', customerPhone ? { phone: customerPhone } : { _id: null })
   const lead = leads[0] || null
 
-  const callRecord: any = {
+  const callRecord = {
     lead_id: lead?._id?.toString?.() || '',
     lead_name: lead?.name || customerName || '',
     lead_phone: customerPhone,
@@ -130,17 +125,17 @@ export async function handleEndOfCallReport(payload: any, ctx: AgentRunContext) 
     duration,
     disposition: existingCall?.disposition || '',
     call_outcome: existingCall?.call_outcome || '',
-    call_summary: analysis?.summary || existingCall?.call_summary || '',
-    customer_availability: structuredData?.customer_availability || existingCall?.customer_availability || '',
-    preferred_callback_time: structuredData?.preferred_callback_time || existingCall?.preferred_callback_time || '',
-    preferred_callback_days: structuredData?.preferred_callback_days || existingCall?.preferred_callback_days || [],
-    customer_interest_level: structuredData?.interest_level || existingCall?.customer_interest_level || '',
-    follow_up_required: structuredData?.follow_up_required === true || existingCall?.follow_up_required || false,
-    follow_up_date: structuredData?.follow_up_date || existingCall?.follow_up_date || null,
-    follow_up_notes: structuredData?.follow_up_notes || existingCall?.follow_up_notes || '',
-    key_requirements: structuredData?.key_requirements || existingCall?.key_requirements || '',
-    customer_objections: structuredData?.customer_objections || existingCall?.customer_objections || '',
-    next_steps: structuredData?.next_steps || existingCall?.next_steps || '',
+    call_summary: existingCall?.call_summary || '',
+    customer_availability: existingCall?.customer_availability || '',
+    preferred_callback_time: existingCall?.preferred_callback_time || '',
+    preferred_callback_days: existingCall?.preferred_callback_days || [],
+    customer_interest_level: existingCall?.customer_interest_level || '',
+    follow_up_required: existingCall?.follow_up_required || false,
+    follow_up_date: existingCall?.follow_up_date || null,
+    follow_up_notes: existingCall?.follow_up_notes || '',
+    key_requirements: existingCall?.key_requirements || '',
+    customer_objections: existingCall?.customer_objections || '',
+    next_steps: existingCall?.next_steps || '',
     recording_url: recordingUrl || existingCall?.recording_url || '',
     transcript,
     trai_compliant: true,

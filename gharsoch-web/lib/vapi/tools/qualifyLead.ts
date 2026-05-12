@@ -16,28 +16,13 @@ function buildLeadScoringPayload(args: Record<string, any>) {
 }
 
 export async function qualifyLeadTool(args: Record<string, any>, ctx: AgentRunContext) {
-  const vapiCallId = args.__vapi_call_id || args.vapi_call_id || args.call_id
-  let phone = args.customer_phone
-
-  // Z2: Phone Resolution — If Vapi confuses name/phone, resolve from call context
-  if (!phone || !/^\+?[1-9]\d{1,14}$/.test(phone)) {
-    console.warn('[QUALIFY_LEAD] Invalid phone provided by AI:', phone, '— attempting resolution from call context:', vapiCallId);
-    if (vapiCallId) {
-      const callRow = await ctx.db.findOne('calls', { vapi_call_id: vapiCallId });
-      if (callRow?.lead_phone) {
-        console.info('[QUALIFY_LEAD] Resolved phone from call context:', callRow.lead_phone);
-        phone = callRow.lead_phone;
-      }
-    }
+  if (!args.customer_phone) {
+    throw new Error('customer_phone is required')
   }
 
-  if (!phone) {
-    throw new Error('customer_phone is required and could not be resolved from context')
-  }
+  await ctx.think('evaluation', `Qualifying lead for ${args.customer_phone}.`)
 
-  await ctx.think('evaluation', `Qualifying lead for ${phone}.`)
-
-  const matchingLeads = await ctx.db.findMany('leads', { phone })
+  const matchingLeads = await ctx.db.findMany('leads', { phone: args.customer_phone })
   let lead = matchingLeads[0] || null
   const wasExistingLead = Boolean(lead?._id)
 
@@ -53,7 +38,7 @@ export async function qualifyLeadTool(args: Record<string, any>, ctx: AgentRunCo
       },
       {
         role: 'user',
-        content: JSON.stringify(buildLeadScoringPayload({ ...args, customer_phone: phone })),
+        content: JSON.stringify(buildLeadScoringPayload(args)),
       },
     ],
   })
@@ -62,8 +47,7 @@ export async function qualifyLeadTool(args: Record<string, any>, ctx: AgentRunCo
   const score = Math.max(0, Math.min(100, Number(parsed.score) || 0))
   const interestLevel = String(parsed.interest_level || args.interest_level || (score >= 75 ? 'hot' : score >= 50 ? 'warm' : 'cold'))
   const qualificationStatus = score >= 50 ? 'qualified' : 'unqualified'
-  
-  const updateData: any = {
+  const updateData = {
     budget_range: args.budget_range || lead?.budget_range || '',
     location_pref: args.location_pref || lead?.location_pref || '',
     property_type: args.property_type || lead?.property_type || '',
@@ -79,17 +63,12 @@ export async function qualifyLeadTool(args: Record<string, any>, ctx: AgentRunCo
     notes: parsed.rationale || lead?.notes || '',
   }
 
-  // Z4: Status Propagation — Ensure status is at least 'contacted' after qualification
-  if (!lead?.status || lead.status === 'new') {
-    updateData.status = 'contacted';
-  }
-
   if (lead?._id) {
     await ctx.db.updateOne('leads', { _id: lead._id }, { $set: updateData })
   } else {
     const insertResult = await ctx.db.insertOne('leads', {
       name: args.customer_name || 'Unknown',
-      phone: phone,
+      phone: args.customer_phone,
       email: '',
       source: 'inbound_call',
       status: 'contacted',
@@ -105,7 +84,7 @@ export async function qualifyLeadTool(args: Record<string, any>, ctx: AgentRunCo
       created_at: new Date(),
       ...updateData,
     })
-    lead = { _id: insertResult.insertedId, name: args.customer_name || 'Unknown', phone }
+    lead = { _id: insertResult.insertedId, name: args.customer_name || 'Unknown', phone: args.customer_phone }
   }
 
   if (score >= 75 && lead?._id) {
@@ -116,8 +95,8 @@ export async function qualifyLeadTool(args: Record<string, any>, ctx: AgentRunCo
     })
   }
 
-  await ctx.act('lead_qualified', `Qualified lead ${phone} with score ${score}`, {
-    parameters: { customer_phone: phone },
+  await ctx.act('lead_qualified', `Qualified lead ${args.customer_phone} with score ${score}`, {
+    parameters: { customer_phone: args.customer_phone },
     result: { score, interest_level: interestLevel, qualification_status: qualificationStatus },
   })
 
