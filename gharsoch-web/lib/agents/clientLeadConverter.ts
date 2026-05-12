@@ -1,4 +1,5 @@
 import { runAgent } from '@/lib/runAgent'
+import { createLead } from '@/lib/services/leadService'
 import { ObjectId } from 'mongodb'
 
 export async function runClientLeadConverter(clientId: string): Promise<{ runId: string; lead_id?: string; rejected?: boolean; reason?: string; score?: number; rationale?: string }> {
@@ -13,7 +14,7 @@ export async function runClientLeadConverter(clientId: string): Promise<{ runId:
       if (!client) throw new Error('Client not found')
 
       // Quality gates
-      const missingFields = []
+      const missingFields: string[] = []
       if (!client.phone) missingFields.push('phone')
       if (!client.budget_range && !client.location_pref) missingFields.push('budget_or_location')
       if (missingFields.length) {
@@ -53,25 +54,36 @@ export async function runClientLeadConverter(clientId: string): Promise<{ runId:
       }
 
       // Create Lead from Client
-      const leadDoc = {
+      if (!client.broker_id) {
+        console.error(`[clientLeadConverter] client ${client._id} has no broker_id — cannot create lead`)
+        return { ok: false, rejected: true, reason: 'client_missing_broker', error: 'Client missing broker_id' }
+      }
+
+      const result = await createLead({
+        broker_id: client.broker_id,
         client_id: client._id,
         name: client.name,
         phone: client.phone,
         email: client.email,
+        location_pref: client.location_pref,
         property_type: client.property_type,
         budget_range: client.budget_range,
-        location_pref: client.location_pref,
         notes: client.notes,
-        status: 'new',
+        source: client.source ?? 'client_converter',
         interest_level: parsed.score >= 75 ? 'hot' : parsed.score >= 60 ? 'warm' : 'cold',
-        dnd_status: false,
         lead_score: parsed.score,
         qualification_rationale: parsed.rationale,
-        created_at: new Date(),
-        updated_at: new Date(),
+        qualification_status: 'pending',
+        status: 'new',
+        dnd_status: false,
+      })
+
+      if (!result.ok) {
+        console.error(`[clientLeadConverter] createLead failed: ${result.reason}`)
+        return { ok: false, rejected: true, reason: result.reason, error: 'Lead creation failed' }
       }
-      const insertResult = await ctx.db.insertOne('leads', leadDoc)
-      const leadId = insertResult.insertedId
+
+      const leadId = result.lead_id as ObjectId
 
       await ctx.db.updateOne('clients', { _id: client._id }, { $set: { conversion_status: 'converted', lead_id: leadId, lead_score: parsed.score, updated_at: new Date() } })
       await ctx.act('lead_created', 'Lead qualified and created', { lead_id: leadId.toString(), client_id: clientId, score: parsed.score })

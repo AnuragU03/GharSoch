@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCollection } from '@/lib/mongodb'
+import { createLead } from '@/lib/services/leadService'
 import { ObjectId } from 'mongodb'
-import { DEFAULT_LEAD } from '@/models/Lead'
 import type { Lead } from '@/models/Lead'
 import { authErrorResponse, requireRole, requireSession } from '@/lib/auth'
 import { auth } from '@/lib/auth'
@@ -69,45 +69,29 @@ export async function POST(request: NextRequest) {
     }
 
     // Phase 11.5: stamp lead with session.user.brokerage_id.
-    const body = await request.json()
-    const leads = await getCollection('leads')
+    const body = await request.json();
+    const result = await createLead({ ...body, broker_id: brokerId });
 
-    // B5: Dedup guard
-    if (body.phone) {
-      const normalizedPhone = body.phone.replace(/[^0-9+]/g, '');
-      const query: any = { phone: normalizedPhone, is_deleted: { $ne: true } };
-      if (brokerId) query.broker_id = brokerId;
-      
-      const existing = await leads.findOne(query);
-      if (existing) {
-        return NextResponse.json(
-          {
-            success: false,
-            reason: "duplicate_phone",
-            lead_id: existing._id,
-            lead_name: existing.name,
-            message: `A lead with this phone already exists (${existing.name}).`
-          },
-          { status: 409 }
-        );
+    if (!result.ok) {
+      if (result.reason === "duplicate_phone") {
+        return NextResponse.json({
+          success: false,
+          reason: "duplicate_phone",
+          lead_id: result.existing_lead._id,
+          lead_name: result.existing_lead.name,
+          message: `A lead with this phone already exists (${result.existing_lead.name}).`
+        }, { status: 409 });
       }
-      body.phone = normalizedPhone;
+      return NextResponse.json({
+        success: false,
+        reason: result.reason,
+        message: "Failed to create lead"
+      }, { status: 400 });
     }
-
-    const lead = {
-      ...DEFAULT_LEAD,
-      ...body,
-      broker_id: brokerId,
-      next_follow_up_date: body.next_follow_up_date ? new Date(body.next_follow_up_date) : null,
-      created_at: new Date(),
-      updated_at: new Date(),
-    }
-
-    const result = await leads.insertOne(lead)
 
     return NextResponse.json({
       success: true,
-      lead: { ...lead, _id: result.insertedId },
+      lead: result.lead,
     })
   } catch (error) {
     const authResponse = authErrorResponse(error)

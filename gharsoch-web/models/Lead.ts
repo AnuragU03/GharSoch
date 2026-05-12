@@ -7,6 +7,7 @@ export default async function getLeadCollection() {
 
 export interface Lead {
   _id?: ObjectId
+  broker_id: string
   name: string
   phone: string
   email: string
@@ -38,7 +39,8 @@ export interface Lead {
   updated_at: Date
 }
 
-export const DEFAULT_LEAD: Omit<Lead, '_id'> = {
+export const DEFAULT_LEAD: Omit<Lead, '_id' | 'broker_id'> = {
+  // broker_id is stamped at create-time by leadService.createLead — never default it
   name: '',
   phone: '',
   email: '',

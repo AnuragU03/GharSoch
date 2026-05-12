@@ -5,8 +5,15 @@ import { ObjectId } from 'mongodb';
 const DB_NAME = 'test';
 const COLLECTION = 'clients';
 
+export interface CreateClientInput extends Omit<Client, '_id' | 'created_at' | 'updated_at' | 'conversion_status'> {
+  broker_id: string;
+}
+
 export const clientService = {
-  async createClient(data: Omit<Client, '_id' | 'created_at' | 'updated_at' | 'conversion_status'>): Promise<Client> {
+  async createClient(data: CreateClientInput): Promise<Client> {
+    if (!data.broker_id || typeof data.broker_id !== 'string' || data.broker_id.trim() === '') {
+      throw new Error('createClient: valid non-empty broker_id is required');
+    }
     const mongo = await clientPromise;
     const db = mongo.db(DB_NAME);
     const collection = db.collection<Client>(COLLECTION);
@@ -16,6 +23,7 @@ export const clientService = {
       conversion_status: 'pending',
       created_at: new Date(),
       updated_at: new Date(),
+      broker_id: data.broker_id,
     };
 
     const result = await collection.insertOne(newClient as any);

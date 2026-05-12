@@ -1,4 +1,5 @@
 import clientPromise from '@/lib/mongodb'
+import { DEFAULT_LEAD } from '@/models/Lead'
 import type { Lead } from '@/models/Lead'
 import { ObjectId } from 'mongodb'
 
@@ -133,4 +134,76 @@ export const leadService = {
       }
     )
   },
+}
+
+export interface CreateLeadInput {
+  broker_id: string;          // REQUIRED — never optional
+  name: string;
+  phone: string;
+  email?: string;
+  location_pref?: string;
+  property_type?: string;
+  budget_range?: string;
+  notes?: string;
+  source?: string;
+  client_id?: string | ObjectId;
+  next_follow_up_date?: Date | string | null;
+  [key: string]: any;
+}
+
+export interface CreateLeadResult {
+  ok: boolean;
+  lead_id?: ObjectId | string;
+  lead?: any;
+  reason?: "duplicate_phone" | "missing_broker_id";
+  existing_lead?: any;
+}
+
+/**
+ * Single source of truth for creating leads.
+ * Always stamps broker_id, normalizes phone, applies defaults, sets timestamps.
+ * Used by /api/leads/route.ts AND lib/agents/clientLeadConverter.ts.
+ */
+export async function createLead(input: CreateLeadInput): Promise<CreateLeadResult> {
+  if (!input.broker_id || typeof input.broker_id !== "string" || input.broker_id.trim() === "") {
+    throw new Error("createLead: valid non-empty broker_id is required");
+  }
+
+  const leads = await getCollection();
+  const normalizedPhone = (input.phone || '').replace(/[^0-9+]/g, '');
+  const normalizedLocation = (input.location_pref || '').trim();
+
+  // Dedup check (B5)
+  if (normalizedPhone) {
+    const existing = await leads.findOne({
+      phone: normalizedPhone,
+      broker_id: input.broker_id,
+      is_deleted: { $ne: true }
+    });
+    
+    if (existing) {
+      return { ok: false, reason: "duplicate_phone", existing_lead: existing };
+    }
+  }
+
+  const { broker_id, ...restInput } = input;
+
+  const leadDoc = {
+    ...DEFAULT_LEAD,
+    ...restInput,
+    phone: normalizedPhone,
+    location_pref: normalizedLocation,
+    next_follow_up_date: input.next_follow_up_date ? new Date(input.next_follow_up_date) : null,
+    broker_id: input.broker_id,    // last to ensure it cannot be overridden
+    is_deleted: false,
+    created_at: new Date(),
+    updated_at: new Date(),
+  };
+
+  const result = await leads.insertOne(leadDoc as any);
+  return { 
+    ok: true, 
+    lead_id: result.insertedId, 
+    lead: { ...leadDoc, _id: result.insertedId } 
+  };
 }

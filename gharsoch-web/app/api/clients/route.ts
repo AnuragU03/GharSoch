@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { clientService } from '@/lib/services/clientService'
 import { runClientLeadConverter } from '@/lib/agents/clientLeadConverter'
 import { runMatchmakerForLead } from '@/lib/agents/matchmaker'
-import { authErrorResponse, requireRole, requireSession } from '@/lib/auth'
+import { auth, authErrorResponse, requireRole, requireSession } from '@/lib/auth'
+import { requireBrokerId, BrokerScopeMissingError } from '@/lib/auth/requireBroker'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,6 +31,20 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     await requireRole(['admin', 'tech'])
+    const session = await auth()
+    
+    let brokerId: string
+    try {
+      brokerId = requireBrokerId(session)
+    } catch (e) {
+      if (e instanceof BrokerScopeMissingError) {
+        return NextResponse.json(
+          { error: 'broker_scope_missing', message: 'Your account is not provisioned for a brokerage. Contact admin.' },
+          { status: 403 }
+        )
+      }
+      throw e
+    }
     // Phase 11.5: stamp new clients with session.user.brokerage_id.
 
     const body = await request.json()
@@ -54,6 +69,7 @@ export async function POST(request: NextRequest) {
       location_pref: location_pref || '',
       property_type: property_type || '',
       notes: notes || '',
+      broker_id: brokerId,
     })
 
     // Fire converter, but don't block the response

@@ -2,6 +2,7 @@ import { ObjectId } from "mongodb";
 
 export interface Client {
   _id?: ObjectId;
+  broker_id: string;
   name: string;
   phone: string;
   email?: string;
