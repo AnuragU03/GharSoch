@@ -5,6 +5,7 @@ import { openaiChatCompletion, type OpenAIChatMessage } from '@/lib/openaiClient
 import { reasoningSummaryGenerator } from '@/lib/reasoningSummaryGenerator'
 import {
   triggerCampaignCall,
+  triggerCallbackCall,
   triggerOutboundCall,
   triggerReminderCall,
   getCallDetails,
@@ -62,6 +63,7 @@ export type AgentRunContext = {
   vapi: {
     triggerOutboundCall: typeof triggerOutboundCall
     triggerCampaignCall: typeof triggerCampaignCall
+    triggerCallbackCall: typeof triggerCallbackCall
     triggerReminderCall: typeof triggerReminderCall
     getCallDetails: typeof getCallDetails
   }
@@ -214,6 +216,12 @@ export async function runAgent<TInput extends Record<string, any>, TOutput>(opts
         await agentLogger.logAgentAction(runId, 'vapi', 'triggerCampaignCall', { phone: lead.phone })
         const res = await triggerCampaignCall(lead, campaignContext, propertiesContext)
         await agentLogger.logAgentAction(runId, 'vapi_result', 'triggerCampaignCall result', undefined, res as Record<string, any>)
+        return res
+      },
+      triggerCallbackCall: async (appointment) => {
+        await agentLogger.logAgentAction(runId, 'vapi', 'triggerCallbackCall', { lead_phone: appointment.lead_phone })
+        const res = await triggerCallbackCall(appointment)
+        await agentLogger.logAgentAction(runId, 'vapi_result', 'triggerCallbackCall result', undefined, res as Record<string, any>)
         return res
       },
       triggerReminderCall: async (appointment) => {

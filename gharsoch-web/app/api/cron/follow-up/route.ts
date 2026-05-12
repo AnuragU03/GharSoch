@@ -111,7 +111,7 @@ async function handleFollowupCron(request: NextRequest) {
             ? await propsCol.findOne({ _id: new ObjectId(inheritedPropertyId.toString()) })
             : null
 
-          const result = await ctx.vapi.triggerReminderCall({
+          const result = await ctx.vapi.triggerCallbackCall({
             phone: lead.phone,
             name: lead.name,
             variables: {

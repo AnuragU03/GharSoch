@@ -238,6 +238,34 @@ export async function triggerReminderCall(params: {
 }
 
 /**
+ * Trigger a callback call for a customer who requested a follow-up call.
+ * Uses the dedicated CALLBACK assistant (with full booking toolkit).
+ * Falls back to REMINDER assistant if VAPI_ASSISTANT_CALLBACK_ID is not set.
+ */
+export async function triggerCallbackCall(params: {
+  phone: string
+  name?: string
+  variables?: Record<string, string>
+}, opts?: { logHook?: VapiLogHook }): Promise<VapiCallResponse> {
+  const callbackId = process.env.VAPI_ASSISTANT_CALLBACK_ID
+  const reminderId = process.env.VAPI_ASSISTANT_REMINDER_ID
+  const assistantId = callbackId || reminderId
+  if (!assistantId) {
+    return { success: false, error: 'Neither VAPI_ASSISTANT_CALLBACK_ID nor VAPI_ASSISTANT_REMINDER_ID configured' }
+  }
+  if (!callbackId) {
+    console.warn('[triggerCallbackCall] VAPI_ASSISTANT_CALLBACK_ID not set — falling back to REMINDER assistant. Customer-callback flow may have limited tools.')
+  }
+
+  return triggerOutboundCall({
+    assistantId,
+    customerPhone: params.phone,
+    customerName: params.name,
+    metadata: params.variables || {},
+  }, opts)
+}
+
+/**
  * Get call details from Vapi.
  */
 export async function getCallDetails(callId: string, opts?: { logHook?: VapiLogHook }) {

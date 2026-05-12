@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCollection } from '@/lib/mongodb'
 import { leadHasRecentOutboundCall } from '@/lib/services/callService'
-import { triggerReminderCall } from '@/lib/vapiClient'
+import { triggerCallbackCall } from '@/lib/vapiClient'
 import { ObjectId } from 'mongodb'
 
 export const dynamic = 'force-dynamic'
@@ -71,7 +71,7 @@ async function handleFollowupsCron(request: NextRequest) {
         ? await propsCol.findOne({ _id: new ObjectId(inheritedPropertyId.toString()) })
         : null
 
-      const res = await triggerReminderCall({
+      const res = await triggerCallbackCall({
         phone: lead.phone,
         name: lead.name,
         variables: {
