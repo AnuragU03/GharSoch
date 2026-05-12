@@ -100,14 +100,44 @@ async function handleFollowupCron(request: NextRequest) {
           const callsCol = await getCollection('calls')
           const propsCol = await getCollection('properties')
 
-          const priorCalls = await callsCol.find({
-            lead_id: lead._id,
-            direction: 'outbound',
-            matched_property_id: { $exists: true, $ne: null }
-          }).sort({ created_at: -1 }).limit(1).toArray()
+          // Z12: Resolve matched_property_id from multiple sources.
+          // The matchmaker stores lead_id on calls as a string (not ObjectId),
+          // so a direct query with lead._id (ObjectId) silently returns 0 results.
+          // Defense-in-depth: try call inheritance with $or for both types,
+          // then fall back to reading lead.matched_property_id directly.
+          let inheritedPropertyId: string | null = null
+          let inheritedPropertyTitle: string | null = null
 
-          const inheritedPropertyId = priorCalls[0]?.matched_property_id
-          const inheritedProperty = inheritedPropertyId 
+          // Source 1: Look up most recent prior call's matched_property_id
+          const priorCall = await callsCol.findOne(
+            {
+              $or: [
+                { lead_id: lead._id },
+                { lead_id: lead._id?.toString?.() || String(lead._id) },
+              ],
+              direction: 'outbound',
+              matched_property_id: { $exists: true, $ne: null }
+            },
+            { sort: { created_at: -1 } }
+          )
+
+          if (priorCall) {
+            inheritedPropertyId = priorCall.matched_property_id
+            inheritedPropertyTitle = priorCall.matched_property_title || null
+          }
+
+          // Source 2 (fallback): Read directly from lead document
+          if (!inheritedPropertyId && lead.matched_property_id) {
+            inheritedPropertyId = lead.matched_property_id
+            inheritedPropertyTitle = lead.matched_property_title || null
+          }
+
+          if (!inheritedPropertyId) {
+            console.warn(`[follow-up cron] No matched_property_id found for lead ${lead._id} — callback will lack property context`)
+          }
+
+          // Fetch full property for location context
+          const inheritedProperty = inheritedPropertyId
             ? await propsCol.findOne({ _id: new ObjectId(inheritedPropertyId.toString()) })
             : null
 
@@ -121,8 +151,8 @@ async function handleFollowupCron(request: NextRequest) {
               location_pref: lead.location_pref || 'your preferred area',
               budget_range: lead.budget_range || '',
               prior_topic: lead.notes || 'properties you discussed earlier',
-              matched_property_id: inheritedPropertyId?.toString() || '',
-              matched_property_title: inheritedProperty?.title || '',
+              matched_property_id: inheritedPropertyId || '',
+              matched_property_title: inheritedPropertyTitle || inheritedProperty?.title || '',
               matched_property_location: inheritedProperty?.location || '',
             }
           })
@@ -137,12 +167,13 @@ async function handleFollowupCron(request: NextRequest) {
               lead_id: leadEvaluation.lead_id,
               lead_name: lead.name,
               lead_phone: lead.phone,
-              agent_name: 'Follow-Up Reminder',
-              agent_id: process.env.VAPI_ASSISTANT_REMINDER_ID || 'system',
+              agent_name: 'Follow-Up Callback',
+              agent_id: process.env.VAPI_ASSISTANT_CALLBACK_ID || process.env.VAPI_ASSISTANT_REMINDER_ID || 'system',
               campaign_id: 'auto-follow-up',
               direction: 'outbound',
               call_type: 'follow_up_callback',
               matched_property_id: inheritedPropertyId || null,
+              matched_property_title: inheritedPropertyTitle || inheritedProperty?.title || null,
               duration: 0,
               disposition: 'queued',
               call_outcome: 'pending',
