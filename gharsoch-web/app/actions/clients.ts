@@ -59,7 +59,7 @@ export async function createClientAction(formData: FormData) {
     const existing = await clientsCol.findOne({
       phone,
       broker_id: brokerId,
-      deleted_at: { $exists: false },
+      is_deleted: { $ne: true },
     });
 
     if (existing) {
@@ -134,7 +134,7 @@ export async function updateClientAction(formData: FormData) {
       {
         _id: new ObjectId(clientId),
         broker_id: brokerId,
-        deleted_at: { $exists: false },
+        is_deleted: { $ne: true },
       },
       {
         $set: {

@@ -62,7 +62,7 @@ export const clientService = {
     const collection = db.collection<Client>(COLLECTION);
 
     const query: any = {
-      deleted_at: { $exists: false }, // X2: hide soft-deleted clients
+      is_deleted: { $ne: true }, // B16: canonical soft-delete filter
     };
     if (options.status) query.conversion_status = options.status;
     if (options.source) query.source = options.source;
