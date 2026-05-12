@@ -5,12 +5,29 @@ import { ObjectId } from 'mongodb';
 
 import { runClientLeadConverter } from '@/lib/agents/clientLeadConverter';
 import { runMatchmakerForLead } from '@/lib/agents/matchmaker';
-import { requireRole } from '@/lib/auth';
+import { auth, requireRole } from '@/lib/auth';
+import { requireBrokerId, BrokerScopeMissingError } from '@/lib/auth/requireBroker';
 import { getCollection } from '@/lib/mongodb';
 import { clientService } from '@/lib/services/clientService';
 
 export async function createClientAction(formData: FormData) {
   await requireRole(['admin', 'tech']);
+  const session = await auth();
+
+  let brokerId: string;
+  try {
+    brokerId = requireBrokerId(session);
+  } catch (e) {
+    if (e instanceof BrokerScopeMissingError) {
+      return {
+        success: false,
+        error: 'broker_scope_missing',
+        message: 'Your account is not provisioned for a brokerage. Contact admin.',
+      };
+    }
+    throw e;
+  }
+
   // Phase 11.5: stamp and filter clients by session.user.brokerage_id.
   const name = formData.get('name') as string;
   const phone = formData.get('phone') as string;
@@ -37,12 +54,22 @@ export async function createClientAction(formData: FormData) {
   };
 
   try {
-    const existingClients = await clientService.listClients({ limit: 1000 });
-    if (existingClients.some((client) => client.phone === phone)) {
+    // Dedup check: query directly to ensure broker-scoping (listClients doesn't support it yet)
+    const clientsCol = await getCollection('clients');
+    const existing = await clientsCol.findOne({
+      phone,
+      broker_id: brokerId,
+      deleted_at: { $exists: false },
+    });
+
+    if (existing) {
       return { success: false, error: 'A client with this phone number already exists.' };
     }
 
-    const client = await clientService.createClient(payload);
+    const client = await clientService.createClient({
+      ...payload,
+      broker_id: brokerId,
+    });
 
     queueMicrotask(async () => {
       try {
@@ -67,6 +94,22 @@ export async function createClientAction(formData: FormData) {
 
 export async function updateClientAction(formData: FormData) {
   await requireRole(['admin', 'tech']);
+  const session = await auth();
+
+  let brokerId: string;
+  try {
+    brokerId = requireBrokerId(session);
+  } catch (e) {
+    if (e instanceof BrokerScopeMissingError) {
+      return {
+        ok: false,
+        error: 'broker_scope_missing',
+        message: 'Your account is not provisioned for a brokerage. Contact admin.',
+      };
+    }
+    throw e;
+  }
+
   const clientId = String(formData.get('id') || '').trim();
   if (!ObjectId.isValid(clientId)) {
     return { ok: false, error: 'Invalid client ID' };
@@ -88,7 +131,11 @@ export async function updateClientAction(formData: FormData) {
   try {
     const col = await getCollection('clients');
     const result = await col.updateOne(
-      { _id: new ObjectId(clientId), deleted_at: { $exists: false } },
+      {
+        _id: new ObjectId(clientId),
+        broker_id: brokerId,
+        deleted_at: { $exists: false },
+      },
       {
         $set: {
           ...updates,
@@ -98,7 +145,7 @@ export async function updateClientAction(formData: FormData) {
     );
 
     if (result.matchedCount === 0) {
-      return { ok: false, error: 'Client not found' };
+      return { ok: false, error: 'Client not found or access denied' };
     }
 
     revalidatePath('/clients');
@@ -112,13 +159,32 @@ export async function updateClientAction(formData: FormData) {
 
 export async function deleteClientAction(clientId: string) {
   await requireRole(['admin', 'tech']);
+  const session = await auth();
+
+  let brokerId: string;
+  try {
+    brokerId = requireBrokerId(session);
+  } catch (e) {
+    if (e instanceof BrokerScopeMissingError) {
+      return {
+        ok: false,
+        error: 'broker_scope_missing',
+        message: 'Your account is not provisioned for a brokerage. Contact admin.',
+      };
+    }
+    throw e;
+  }
+
   if (!ObjectId.isValid(clientId)) {
     return { ok: false, error: 'Invalid client ID' };
   }
   try {
     const col = await getCollection('clients');
     const result = await col.updateOne(
-      { _id: new ObjectId(clientId) },
+      {
+        _id: new ObjectId(clientId),
+        broker_id: brokerId,
+      },
       {
         $set: {
           deleted_at: new Date(),
@@ -128,7 +194,7 @@ export async function deleteClientAction(clientId: string) {
       }
     );
     if (result.matchedCount === 0) {
-      return { ok: false, error: 'Client not found' };
+      return { ok: false, error: 'Client not found or access denied' };
     }
     revalidatePath('/clients');
     revalidatePath('/ai-operations');
