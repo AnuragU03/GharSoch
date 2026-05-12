@@ -74,7 +74,7 @@ async function getCollection() {
 export const leadService = {
   async listByStage(): Promise<Record<LeadPipelineStage, SerializedLead[]>> {
     const collection = await getCollection()
-    const leads = (await collection.find({}).toArray()).sort(byRecentTimestamp)
+    const leads = (await collection.find({ is_deleted: { $ne: true } }).toArray()).sort(byRecentTimestamp)
 
     const grouped: Record<LeadPipelineStage, SerializedLead[]> = {
       new: [],
@@ -93,13 +93,13 @@ export const leadService = {
 
   async listAll(): Promise<SerializedLead[]> {
     const collection = await getCollection()
-    const leads = (await collection.find({}).toArray()).sort(byRecentTimestamp)
+    const leads = (await collection.find({ is_deleted: { $ne: true } }).toArray()).sort(byRecentTimestamp)
     return leads.map(serializeLead)
   },
 
   async getStats(): Promise<LeadPipelineStats> {
     const collection = await getCollection()
-    const leads = await collection.find({}).toArray()
+    const leads = await collection.find({ is_deleted: { $ne: true } }).toArray()
     const total = leads.length
     const hot = leads.filter((lead) => String((lead as any).interest_level || '').toLowerCase() === 'hot').length
     const warm = leads.filter((lead) => String((lead as any).interest_level || '').toLowerCase() === 'warm').length

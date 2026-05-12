@@ -27,6 +27,7 @@ export async function runMatchmaker(leadId?: string): Promise<any> {
       const leadQuery: any = {
         status: 'new',
         dnd_status: { $ne: true },
+        is_deleted: { $ne: true },
       };
       
       if (leadId) {

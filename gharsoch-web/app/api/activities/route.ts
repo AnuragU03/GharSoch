@@ -18,7 +18,7 @@ export async function GET() {
     const activities: any[] = []
 
     // Recent leads (last 20)
-    const recentLeads = await leads.find({}).sort({ created_at: -1 }).limit(20).toArray()
+    const recentLeads = await leads.find({ is_deleted: { $ne: true } }).sort({ created_at: -1 }).limit(20).toArray()
     for (const lead of recentLeads) {
       activities.push({
         type: 'lead_created',
@@ -42,7 +42,7 @@ export async function GET() {
     }
 
     // Recent appointments (last 10)
-    const recentAppointments = await appointments.find({}).sort({ created_at: -1 }).limit(10).toArray()
+    const recentAppointments = await appointments.find({ is_deleted: { $ne: true } }).sort({ created_at: -1 }).limit(10).toArray()
     for (const appt of recentAppointments) {
       activities.push({
         type: 'appointment',

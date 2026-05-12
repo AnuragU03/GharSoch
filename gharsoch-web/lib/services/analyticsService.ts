@@ -71,16 +71,16 @@ export async function getKPIs(range: AnalyticsRange = '7d'): Promise<AnalyticsKP
     ])
 
     const [totalLeads, distinctLeadsCalled, bookings, closes, totalCalls] = await Promise.all([
-      leadsCol.countDocuments({ created_at: { $gte: cutoff } }),
+      leadsCol.countDocuments({ is_deleted: { $ne: true }, created_at: { $gte: cutoff } }),
       callsCol.distinct('lead_id', { created_at: { $gte: cutoff }, direction: 'outbound' }).then(res => res.length),
-      appointmentsCol.countDocuments({ created_at: { $gte: cutoff } }),
-      leadsCol.countDocuments({ status: { $in: ['closed', 'won'] }, updated_at: { $gte: cutoff } }),
+      appointmentsCol.countDocuments({ is_deleted: { $ne: true }, created_at: { $gte: cutoff } }),
+      leadsCol.countDocuments({ is_deleted: { $ne: true }, status: { $in: ['closed', 'won'] }, updated_at: { $gte: cutoff } }),
       callsCol.countDocuments({ created_at: { $gte: cutoff } })
     ])
 
     // Avg response: time from lead creation to first call (sampled, simplified)
     const recentLeads = await leadsCol
-      .find({ created_at: { $gte: cutoff }, first_contact_at: { $exists: true } })
+      .find({ is_deleted: { $ne: true }, created_at: { $gte: cutoff }, first_contact_at: { $exists: true } })
       .project({ created_at: 1, first_contact_at: 1 })
       .limit(50)
       .toArray()
@@ -138,11 +138,11 @@ export async function getFunnel(range: AnalyticsRange = '7d'): Promise<Analytics
     ])
 
     const [clients, leads, connected, visits, allLeads] = await Promise.all([
-      clientsCol ? clientsCol.countDocuments({ created_at: { $gte: cutoff } }) : Promise.resolve(0),
-      leadsCol.countDocuments({ created_at: { $gte: cutoff } }),
+      clientsCol ? clientsCol.countDocuments({ is_deleted: { $ne: true }, created_at: { $gte: cutoff } }) : Promise.resolve(0),
+      leadsCol.countDocuments({ is_deleted: { $ne: true }, created_at: { $gte: cutoff } }),
       callsCol.countDocuments({ created_at: { $gte: cutoff }, call_status: { $in: ['completed', 'connected'] } }),
-      appointmentsCol.countDocuments({ created_at: { $gte: cutoff } }),
-      leadsCol.countDocuments({ created_at: { $gte: cutoff }, matched_property_id: { $exists: true } }),
+      appointmentsCol.countDocuments({ is_deleted: { $ne: true }, created_at: { $gte: cutoff } }),
+      leadsCol.countDocuments({ is_deleted: { $ne: true }, created_at: { $gte: cutoff }, matched_property_id: { $exists: true } }),
     ])
 
     return {

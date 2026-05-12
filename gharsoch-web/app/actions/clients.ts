@@ -8,7 +8,7 @@ import { runMatchmakerForLead } from '@/lib/agents/matchmaker';
 import { auth, requireRole } from '@/lib/auth';
 import { requireBrokerId, BrokerScopeMissingError } from '@/lib/auth/requireBroker';
 import { getCollection } from '@/lib/mongodb';
-import { clientService } from '@/lib/services/clientService';
+import { clientService, softDeleteClientCascade } from '@/lib/services/clientService';
 
 export async function createClientAction(formData: FormData) {
   await requireRole(['admin', 'tech']);
@@ -178,29 +178,28 @@ export async function deleteClientAction(clientId: string) {
   if (!ObjectId.isValid(clientId)) {
     return { ok: false, error: 'Invalid client ID' };
   }
+
   try {
-    const col = await getCollection('clients');
-    const result = await col.updateOne(
-      {
-        _id: new ObjectId(clientId),
-        broker_id: brokerId,
-      },
-      {
-        $set: {
-          deleted_at: new Date(),
-          status: 'archived',
-          updated_at: new Date(),
-        },
-      }
-    );
-    if (result.matchedCount === 0) {
-      return { ok: false, error: 'Client not found or access denied' };
+    const result = await softDeleteClientCascade(clientId, brokerId);
+
+    if (!result.ok) {
+      const errorMsg = result.error === 'client_not_found_or_access_denied'
+        ? 'Client not found or access denied'
+        : `Failed to delete client: ${result.error}`;
+      return { ok: false, error: errorMsg };
     }
+
     revalidatePath('/clients');
+    revalidatePath('/leads');
     revalidatePath('/ai-operations');
-    return { ok: true };
+    return {
+      ok: true,
+      leads_deleted: result.leads_deleted,
+      appointments_deleted: result.appointments_deleted,
+      calls_superseded: result.calls_superseded,
+    };
   } catch (err) {
-    console.error('[DELETE_CLIENT]', err);
+    console.error('[DELETE_CLIENT_CASCADE]', err);
     return { ok: false, error: err instanceof Error ? err.message : 'Unknown error' };
   }
 }

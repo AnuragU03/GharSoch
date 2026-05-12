@@ -23,6 +23,7 @@ async function handleFollowupsCron(request: NextRequest) {
     // Find leads where next_follow_up_date is in the past, and not yet contacted for this follow-up
     // We'll reset the next_follow_up_date once triggered so we don't spam them.
     const pendingFollowups = await leadsCollection.find({
+      is_deleted: { $ne: true },
       next_follow_up_date: { $lte: now, $ne: null }
     }).toArray()
 

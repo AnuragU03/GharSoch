@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const skip = parseInt(searchParams.get('skip') || '0')
 
     const leads = await getCollection('leads')
-    const filter: Record<string, any> = {}
+    const filter: Record<string, any> = { is_deleted: { $ne: true } }
 
     if (status) filter.status = status
     if (qualification) filter.qualification_status = qualification

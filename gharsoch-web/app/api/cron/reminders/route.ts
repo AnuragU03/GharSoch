@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
         const dueAppointments = await ctx.db.findMany('appointments', {
           status: 'scheduled',
           reminder_sent: { $ne: true },
+          is_deleted: { $ne: true },
           scheduled_at: { $gte: now, $lte: windowEnd },
         })
 

@@ -27,9 +27,10 @@ export async function getSidebarCounts(): Promise<{
     const endOfIstDay = new Date(istTomorrow.getTime() - istOffset)
 
     const [leads, clients, appointments, pendingUsers] = await Promise.all([
-      leadsCollection.countDocuments({ status: { $nin: ['closed', 'lost', 'won'] } }),
-      clientsCollection.countDocuments({ conversion_status: { $in: ['pending', 'converting'] } }),
+      leadsCollection.countDocuments({ is_deleted: { $ne: true }, status: { $nin: ['closed', 'lost', 'won'] } }),
+      clientsCollection.countDocuments({ is_deleted: { $ne: true }, conversion_status: { $in: ['pending', 'converting'] } }),
       appointmentsCollection.countDocuments({
+        is_deleted: { $ne: true },
         appointment_date: {
           $gte: startOfIstDay.toISOString(),
           $lt: endOfIstDay.toISOString(),

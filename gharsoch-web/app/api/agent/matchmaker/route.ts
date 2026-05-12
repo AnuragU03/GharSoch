@@ -28,7 +28,8 @@ export async function POST(request: NextRequest) {
     // Fetch unmatched clients (status: new or qualification_status: unqualified)
     const clients = await leadsCollection.find({
       status: 'new',
-      dnd_status: { $ne: true }
+      dnd_status: { $ne: true },
+      is_deleted: { $ne: true }
     }).toArray()
 
     if (clients.length === 0) {

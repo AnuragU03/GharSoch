@@ -33,22 +33,22 @@ export async function GET() {
       qualifiedLeads,
       dncCount,
     ] = await Promise.all([
-      leads.countDocuments({}),
-      leads.countDocuments({ created_at: { $gte: today, $lt: tomorrow } }),
-      leads.countDocuments({ interest_level: 'hot' }),
+      leads.countDocuments({ is_deleted: { $ne: true }, is_deleted: { $ne: true } }),
+      leads.countDocuments({ is_deleted: { $ne: true }, created_at: { $gte: today, $lt: tomorrow } }),
+      leads.countDocuments({ is_deleted: { $ne: true }, interest_level: 'hot' }),
       calls.countDocuments({}),
       calls.countDocuments({ created_at: { $gte: today, $lt: tomorrow } }),
-      appointments.countDocuments({}),
-      appointments.countDocuments({ scheduled_at: { $gte: new Date() }, status: { $in: ['scheduled', 'confirmed'] } }),
+      appointments.countDocuments({ is_deleted: { $ne: true }, is_deleted: { $ne: true } }),
+      appointments.countDocuments({ is_deleted: { $ne: true }, scheduled_at: { $gte: new Date() }, status: { $in: ['scheduled', 'confirmed'] } }),
       campaigns.countDocuments({ status: 'active' }),
       campaigns.countDocuments({}),
-      leads.countDocuments({ qualification_status: 'qualified' }),
-      leads.countDocuments({ dnd_status: true }),
+      leads.countDocuments({ is_deleted: { $ne: true }, qualification_status: 'qualified' }),
+      leads.countDocuments({ is_deleted: { $ne: true }, dnd_status: true }),
     ])
 
     // Conversion funnel
-    const contactedLeads = await leads.countDocuments({ total_calls: { $gt: 0 } })
-    const appointmentLeadIds = await appointments.distinct('lead_id')
+    const contactedLeads = await leads.countDocuments({ is_deleted: { $ne: true }, total_calls: { $gt: 0 } })
+    const appointmentLeadIds = await appointments.distinct('lead_id', { is_deleted: { $ne: true } })
     const appointmentLeads = appointmentLeadIds.length
 
     // Call performance (last 7 days)

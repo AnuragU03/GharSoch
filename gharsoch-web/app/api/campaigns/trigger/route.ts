@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     // Single lead trigger
     if (leadId) {
       const leads = await getCollection('leads')
-      const lead = await leads.findOne({ _id: new ObjectId(leadId) })
+      const lead = await leads.findOne({ _id: new ObjectId(leadId), is_deleted: { $ne: true } })
 
       if (!lead) {
         return NextResponse.json({ success: false, error: 'Lead not found' }, { status: 404 })
@@ -135,6 +135,7 @@ export async function POST(request: NextRequest) {
       const targetLeads = await leads.find({
         _id: { $in: campaign.target_lead_ids.map((id: string) => new ObjectId(id)) },
         dnd_status: { $ne: true },
+        is_deleted: { $ne: true },
       }).toArray()
 
       if (targetLeads.length === 0) {

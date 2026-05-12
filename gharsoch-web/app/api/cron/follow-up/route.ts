@@ -35,6 +35,7 @@ async function handleFollowupCron(request: NextRequest) {
         const dueFollowUps = await ctx.db.findMany('leads', {
           status: 'follow_up',
           dnd_status: { $ne: true },
+          is_deleted: { $ne: true },
           next_follow_up_date: { $lte: now },
         })
 
