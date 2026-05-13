@@ -119,6 +119,7 @@ export async function phoneHasRecentOutboundCall(phone: string, withinMinutes = 
   const collection = await getCollection()
   const count = await collection.countDocuments({
     direction: 'outbound',
+    superseded: { $ne: true },
     created_at: { $gte: cutoff },
     $or: [
       { customer_number: phone } as any,
@@ -145,6 +146,7 @@ export async function leadHasRecentOutboundCall(
       lead_id: { $in: [leadId, leadId.toString()] } as any,
       direction: 'outbound',
       call_type: source,
+      superseded: { $ne: true },
       created_at: { $gte: effectiveCutoff }
     })
     return recentSameSource > 0
@@ -158,6 +160,7 @@ export async function leadHasRecentOutboundCall(
   const leadCount = await callsCollection.countDocuments({
     lead_id: { $in: [leadId, leadId.toString()] } as any,
     direction: 'outbound',
+    superseded: { $ne: true },
     created_at: { $gte: effectiveCutoff },
   })
 
