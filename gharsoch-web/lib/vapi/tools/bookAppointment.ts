@@ -9,11 +9,22 @@ import { getCollection } from '@/lib/mongodb'
  * Priority: ISO scheduled_at → preferred_date + preferred_time → fallback tomorrow 11am IST.
  * Handles: "tomorrow", "today", "day after tomorrow", ISO dates, "4pm", "16:00", "4:30 PM".
  */
+// Z13: Sanity guard — reject dates outside reasonable window (today to today+90 days)
+function isDateSane(d: Date): boolean {
+  const now = Date.now()
+  const minMs = now - 60 * 60 * 1000           // allow 1 hour past (small clock skew)
+  const maxMs = now + 90 * 24 * 60 * 60 * 1000 // 90 days future
+  return d.getTime() >= minMs && d.getTime() <= maxMs
+}
+
 function parseDateTime(args: Record<string, any>): Date {
   // 1. Try direct ISO scheduled_at
   if (args.scheduled_at) {
     const d = new Date(args.scheduled_at)
-    if (!isNaN(d.getTime()) && d > new Date()) return d
+    if (!isNaN(d.getTime()) && d > new Date() && isDateSane(d)) return d
+    if (!isNaN(d.getTime()) && !isDateSane(d)) {
+      console.warn('[BOOK_APPOINTMENT] scheduled_at rejected by sanity guard:', d.toISOString(), 'AI args:', JSON.stringify(args))
+    }
   }
 
   const preferredDate = args.preferred_date
@@ -75,7 +86,12 @@ function parseDateTime(args: Record<string, any>): Date {
         baseDate = new Date(baseDate.getTime() + 24 * 60 * 60 * 1000)
       }
 
-      return baseDate
+      if (!isDateSane(baseDate)) {
+        console.warn('[BOOK_APPOINTMENT] baseDate rejected by sanity guard:', baseDate.toISOString(), 'AI args:', JSON.stringify(args))
+        // fall through to fallback below
+      } else {
+        return baseDate
+      }
     }
   }
 
