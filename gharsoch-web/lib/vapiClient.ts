@@ -30,6 +30,28 @@ interface VapiCallResponse {
 const VAPI_API_KEY = process.env.VAPI_API_KEY || ''
 const VAPI_PHONE_NUMBER_ID = process.env.VAPI_PHONE_NUMBER_ID || ''
 
+/**
+ * Z13/Z15: Build current datetime variables for Vapi assistant context.
+ * AI references these when discussing dates with customers.
+ */
+function buildDateTimeVariables(): { current_datetime_iso: string; current_date_human_ist: string } {
+  const now = new Date()
+  const istHuman = now.toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+  return {
+    current_datetime_iso: now.toISOString(),
+    current_date_human_ist: istHuman,
+  }
+}
+
 function maskPhone(phone: string): string {
   const digits = phone.replace(/\D/g, '')
   if (digits.length <= 4) return '****'
@@ -86,9 +108,17 @@ export async function triggerOutboundCall(
       },
     }
 
+    // Z13/Z15: inject current datetime so assistant knows real date/time.
+    // User-provided metadata can override these if needed (rare).
+    const dateTimeVars = buildDateTimeVariables()
+    const finalVariableValues = {
+      ...dateTimeVars,
+      ...(params.metadata || {}),
+    }
+
     // Pass metadata and tools that get injected into the assistant context
     body.assistantOverrides = {
-      variableValues: params.metadata || {},
+      variableValues: finalVariableValues,
       endCallFunctionEnabled: true,
       endCallMessage: 'Thank you for your time. Have a great day!',
     }
