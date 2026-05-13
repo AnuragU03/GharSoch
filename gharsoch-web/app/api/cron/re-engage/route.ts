@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
         // the $or so leads with neither field don't escape the net.
         const deadLeads = await ctx.db.findMany('leads', {
           dnd_status: { $ne: true },
+          is_deleted: { $ne: true },
           status: { $in: ['cold', 'not_interested'] },
           $or: [
             { last_contacted_at: { $lte: sixtyDaysAgo } },
