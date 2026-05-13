@@ -88,6 +88,7 @@ async function listAllAppointments() {
   return (await collection.find({
     lead_id: { $exists: true, $nin: ['', null] },
     property_id: { $exists: true, $nin: ['', null] },
+    is_deleted: { $ne: true },
   }).toArray()).sort(byScheduledAtAscending)
 }
 
@@ -126,8 +127,8 @@ export const appointmentService = {
     const db = client.db(DB_NAME)
 
     const [lead, property, rawRuns] = await Promise.all([
-      appointment.lead_id ? db.collection('leads').findOne({ _id: new ObjectId(appointment.lead_id) }) : null,
-      appointment.property_id ? db.collection('properties').findOne({ _id: new ObjectId(appointment.property_id) }) : null,
+      appointment.lead_id ? db.collection('leads').findOne({ _id: new ObjectId(appointment.lead_id), is_deleted: { $ne: true } }) : null,
+      appointment.property_id ? db.collection('properties').findOne({ _id: new ObjectId(appointment.property_id), is_deleted: { $ne: true } }) : null,
       db.collection('agent_execution_logs').find({}).limit(200).toArray(),
     ])
 
@@ -213,8 +214,8 @@ export const appointmentService = {
     const client = await clientPromise
     const db = client.db(DB_NAME)
     const [lead, property] = await Promise.all([
-      db.collection('leads').findOne({ _id: new ObjectId(input.lead_id) }),
-      db.collection('properties').findOne({ _id: new ObjectId(input.property_id) }),
+      db.collection('leads').findOne({ _id: new ObjectId(input.lead_id), is_deleted: { $ne: true } }),
+      db.collection('properties').findOne({ _id: new ObjectId(input.property_id), is_deleted: { $ne: true } }),
     ])
 
     if (!lead || !property) {
@@ -245,14 +246,22 @@ export const appointmentService = {
 
   async getStripData(): Promise<AppointmentStripData> {
     const appointments = await listAllAppointments()
+    const todayKey = getIstDateKey(new Date())
+
+    // B19: Count cards must match list semantics — today + upcoming only.
+    // Past appointments excluded from cards (also invisible in lists).
+    const relevant = appointments.filter((item: any) => {
+      const key = getIstDateKey(item.scheduled_at)
+      return key >= todayKey
+    })
 
     return {
-      total: appointments.length,
-      confirmed: appointments.filter((item: any) => item.status === 'confirmed').length,
-      scheduled: appointments.filter((item: any) => item.status === 'scheduled').length,
-      rescheduled: appointments.filter((item: any) => item.status === 'rescheduled').length,
-      awaiting: appointments.filter((item: any) => item.status === 'awaiting_reply' || item.status === 'awaiting').length,
-      completed: appointments.filter((item: any) => item.status === 'completed').length,
+      total: relevant.length,
+      confirmed: relevant.filter((item: any) => item.status === 'confirmed').length,
+      scheduled: relevant.filter((item: any) => item.status === 'scheduled').length,
+      rescheduled: relevant.filter((item: any) => item.status === 'rescheduled').length,
+      awaiting: relevant.filter((item: any) => item.status === 'awaiting_reply' || item.status === 'awaiting').length,
+      completed: relevant.filter((item: any) => item.status === 'completed').length,
     }
   },
 }

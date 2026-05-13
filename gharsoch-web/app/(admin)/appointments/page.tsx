@@ -9,8 +9,8 @@ async function getSelectables() {
     const client = await clientPromise
     const db = client.db('test')
     const [leads, properties] = await Promise.all([
-      db.collection('leads').find({}, { projection: { _id: 1, name: 1, phone: 1 } }).limit(200).toArray(),
-      db.collection('properties').find({}, { projection: { _id: 1, title: 1, location: 1 } }).limit(200).toArray(),
+      db.collection('leads').find({ is_deleted: { $ne: true } }, { projection: { _id: 1, name: 1, phone: 1 } }).limit(200).toArray(),
+      db.collection('properties').find({ is_deleted: { $ne: true } }, { projection: { _id: 1, title: 1, location: 1 } }).limit(200).toArray(),
     ])
     return {
       leads: leads.map((l: any) => ({ _id: String(l._id), name: l.name || '', phone: l.phone || '' })),
