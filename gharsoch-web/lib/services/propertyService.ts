@@ -75,7 +75,7 @@ export const propertyService = {
   } = {}): Promise<SerializedProperty[]> {
     const collection = await getCollection()
     const filter: Record<string, any> = {
-      deleted_at: { $exists: false }, // X2: hide soft-deleted properties
+      is_deleted: { $ne: true }, // X2: hide soft-deleted properties
     }
 
     if (options.status && options.status !== 'available') {
@@ -100,7 +100,7 @@ export const propertyService = {
 
   async get(id: string): Promise<SerializedProperty | null> {
     const collection = await getCollection()
-    const property = await collection.findOne({ _id: new ObjectId(id) })
+    const property = await collection.findOne({ _id: new ObjectId(id), is_deleted: { $ne: true } })
     return property ? serializeProperty(property) : null
   },
 
@@ -133,7 +133,7 @@ export const propertyService = {
 
   async update(id: string, patch: Partial<PropertyInput>) {
     const collection = await getCollection()
-    const existing = await collection.findOne({ _id: new ObjectId(id) })
+    const existing = await collection.findOne({ _id: new ObjectId(id), is_deleted: { $ne: true } })
 
     if (!existing) {
       throw new Error('Property not found')
@@ -179,11 +179,62 @@ export const propertyService = {
   },
 
   async delete(id: string) {
-    const collection = await getCollection()
-    const result = await collection.deleteOne({ _id: new ObjectId(id) })
-    if (result.deletedCount === 0) {
-      throw new Error('Property not found or already deleted')
-    }
-    return { success: true }
+    throw new Error('propertyService.delete() is deprecated — use softDeletePropertyCascade(id) instead');
   },
+}
+
+/**
+ * B14-properties: Cascade soft-delete a property + reset orphan lead matches.
+ * Canonical convention: is_deleted: true + deleted_at: Date set together on writes.
+ * Reads use is_deleted: { $ne: true }.
+ * Order: leads first ($unset matched_property_id so matchmaker re-matches them),
+ * property last.
+ */
+export async function softDeletePropertyCascade(
+  propertyId: string
+): Promise<{ ok: boolean; leads_unmatched: number; error?: string }> {
+  if (!ObjectId.isValid(propertyId)) {
+    return { ok: false, leads_unmatched: 0, error: 'invalid_property_id' };
+  }
+
+  const now = new Date();
+  const propertyObjId = new ObjectId(propertyId);
+  const propertyIdStr = propertyId;
+
+  const client = await clientPromise;
+  const db = client.db('test');
+  const propertiesCol = db.collection('properties');
+  const leadsCol = db.collection('leads');
+
+  // Step 1: $unset matched_property_id on leads pointing to this property
+  // (handles BOTH ObjectId and string lead.matched_property_id storage variants)
+  const leadsResult = await leadsCol.updateMany(
+    {
+      $or: [
+        { matched_property_id: propertyIdStr },
+        { matched_property_id: propertyObjId },
+      ],
+      is_deleted: { $ne: true },
+    },
+    {
+      $unset: { matched_property_id: '', matched_property_title: '' },
+      $set: { updated_at: now },
+    }
+  );
+
+  // Step 2: Soft-delete the property
+  const propertyResult = await propertiesCol.updateOne(
+    { _id: propertyObjId, is_deleted: { $ne: true } },
+    { $set: { is_deleted: true, deleted_at: now, updated_at: now } }
+  );
+
+  if (propertyResult.matchedCount === 0) {
+    return {
+      ok: false,
+      leads_unmatched: leadsResult.modifiedCount,
+      error: 'property_not_found_or_already_deleted',
+    };
+  }
+
+  return { ok: true, leads_unmatched: leadsResult.modifiedCount };
 }

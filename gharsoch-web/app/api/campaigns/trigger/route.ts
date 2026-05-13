@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
       // Fetch premium properties for this lead's city to inject into Vapi memory
       const properties = await getCollection('properties')
       const matchingProperties = await properties.find({ 
+        is_deleted: { $ne: true },
         city: { $regex: new RegExp(`^${lead.place || 'Ahmedabad'}$`, 'i') },
         status: 'available' 
       }).limit(5).toArray()
@@ -165,6 +166,7 @@ export async function POST(request: NextRequest) {
 
         // Fetch premium properties for this lead's city to inject into Vapi memory
         const matchingProperties = await propertiesColl.find({ 
+          is_deleted: { $ne: true },
           city: { $regex: new RegExp(`^${lead.place || 'Ahmedabad'}$`, 'i') },
           status: 'available' 
         }).limit(5).toArray()

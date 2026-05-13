@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch all available properties
     const properties = await propertiesCollection.find({
+      is_deleted: { $ne: true },
       status: 'available'
     }).toArray()
 

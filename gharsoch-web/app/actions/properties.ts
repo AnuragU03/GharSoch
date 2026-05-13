@@ -5,7 +5,7 @@ import { ObjectId } from 'mongodb'
 
 import { requireRole } from '@/lib/auth'
 import { getCollection } from '@/lib/mongodb'
-import { propertyService } from '@/lib/services/propertyService'
+import { propertyService, softDeletePropertyCascade } from '@/lib/services/propertyService'
 
 function parseAmenities(value: FormDataEntryValue | null) {
   const text = String(value || '').trim()
@@ -55,7 +55,7 @@ export async function savePropertyAction(formData: FormData) {
     if (id) {
       await propertyService.update(id, payload)
     } else {
-      await propertyService.create(payload)
+      await propertyService.create({ ...payload, is_deleted: false } as any)
     }
 
     revalidatePath('/properties')
@@ -73,23 +73,17 @@ export async function deletePropertyAction(propertyId: string) {
     return { ok: false, error: 'Invalid property ID' }
   }
   try {
-    const col = await getCollection('properties')
-    const result = await col.updateOne(
-      { _id: new ObjectId(propertyId) },
-      {
-        $set: {
-          deleted_at: new Date(),
-          status: 'archived',
-          updated_at: new Date(),
-        },
-      }
-    )
-    if (result.matchedCount === 0) {
-      return { ok: false, error: 'Property not found' }
+    const result = await softDeletePropertyCascade(propertyId)
+    if (!result.ok) {
+      const errorMsg = result.error === 'property_not_found_or_already_deleted'
+        ? 'Property not found or already deleted'
+        : `Failed to delete property: ${result.error}`
+      return { ok: false, error: errorMsg }
     }
     revalidatePath('/properties')
+    revalidatePath('/leads')
     revalidatePath('/ai-operations')
-    return { ok: true }
+    return { ok: true, leads_unmatched: result.leads_unmatched }
   } catch (err) {
     console.error('[DELETE_PROPERTY]', err)
     return { ok: false, error: err instanceof Error ? err.message : 'Unknown error' }
@@ -159,7 +153,7 @@ export async function updatePropertyAction(formData: FormData) {
   try {
     const col = await getCollection('properties')
     const result = await col.updateOne(
-      { _id: new ObjectId(propertyId), deleted_at: { $exists: false } },
+      { _id: new ObjectId(propertyId), is_deleted: { $ne: true } },
       { $set: { ...updates, updated_at: new Date() } },
     )
 

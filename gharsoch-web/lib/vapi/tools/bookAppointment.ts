@@ -164,7 +164,7 @@ export async function bookAppointmentTool(args: Record<string, any>, ctx: AgentR
   const lead = ObjectId.isValid(leadId)
     ? await ctx.db.findOne('leads', { _id: new ObjectId(leadId) })
     : null
-  const property = await ctx.db.findOne('properties', { _id: propertyId })
+  const property = await ctx.db.findOne('properties', { _id: propertyId, is_deleted: { $ne: true } })
 
   if (!property) {
     return { error: 'Property not found for property_id' }

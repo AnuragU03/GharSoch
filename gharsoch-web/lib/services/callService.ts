@@ -264,7 +264,7 @@ export const callService = {
         if (!appointment?.property_id || !ObjectId.isValid(appointment.property_id)) {
           return null
         }
-        return db.collection('properties').findOne({ _id: new ObjectId(appointment.property_id) })
+        return db.collection('properties').findOne({ _id: new ObjectId(appointment.property_id), is_deleted: { $ne: true } })
       })(),
     ])
 

@@ -36,6 +36,7 @@ export async function runMatchmaker(leadId?: string): Promise<any> {
 
       const unmatchedLeads = await ctx.db.findMany('leads', leadQuery);
       const availableProperties = await ctx.db.findMany('properties', {
+        is_deleted: { $ne: true },
         status: 'available',
       });
 

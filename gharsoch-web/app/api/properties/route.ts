@@ -4,6 +4,7 @@ import { ObjectId } from 'mongodb'
 import { DEFAULT_PROPERTY } from '@/models/Property'
 import SEED_PROPERTIES from '@/data/propertySeed'
 import { authErrorResponse, requireRole, requireSession } from '@/lib/auth'
+import { softDeletePropertyCascade } from '@/lib/services/propertyService'
 
 export async function GET(request: NextRequest) {
   try {
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const filter: Record<string, any> = {}
+    const filter: Record<string, any> = { is_deleted: { $ne: true } }
 
     if (type) filter.type = type
     if (builder) filter.builder = builder
@@ -140,12 +141,12 @@ export async function PUT(request: NextRequest) {
     if (updates.bedrooms) updates.bedrooms = Number(updates.bedrooms)
 
     const result = await properties.updateOne(
-      { _id: new ObjectId(_id) },
+      { _id: new ObjectId(_id), is_deleted: { $ne: true } },
       { $set: { ...updates, updated_at: new Date() } }
     )
 
     if (result.matchedCount === 0) {
-      return NextResponse.json({ success: false, error: 'Property not found' }, { status: 404 })
+      return NextResponse.json({ success: false, error: 'Property not found or already deleted' }, { status: 404 })
     }
 
     return NextResponse.json({ success: true, modified: result.modifiedCount })
@@ -169,8 +170,15 @@ export async function DELETE(request: NextRequest) {
 
     // Delete all
     if (all === 'true') {
+      const confirm = searchParams.get('confirm')
+      if (confirm !== 'DESTROY-ALL') {
+        return NextResponse.json({ 
+          success: false, 
+          error: 'Mass delete requires ?confirm=DESTROY-ALL parameter for safety' 
+        }, { status: 400 })
+      }
       const result = await properties.deleteMany({})
-      return NextResponse.json({ success: true, deletedCount: result.deletedCount })
+      return NextResponse.json({ success: true, deletedCount: result.deletedCount, mode: 'hard_delete_all' })
     }
 
     // Bulk delete by ids (from request body)
@@ -181,17 +189,29 @@ export async function DELETE(request: NextRequest) {
       if (!ids.length) {
         return NextResponse.json({ success: false, error: 'id or ids is required' }, { status: 400 })
       }
-      const result = await properties.deleteMany({ _id: { $in: ids.map(i => new ObjectId(i)) } })
-      return NextResponse.json({ success: true, deletedCount: result.deletedCount })
+      const { softDeletePropertyCascade } = await import('@/lib/services/propertyService')
+      const results = await Promise.all(ids.map(softDeletePropertyCascade))
+      const successCount = results.filter(r => r.ok).length
+      const totalLeadsUnmatched = results.reduce((sum, r) => sum + r.leads_unmatched, 0)
+      return NextResponse.json({ 
+        success: true, 
+        deletedCount: successCount, 
+        leads_unmatched: totalLeadsUnmatched,
+        mode: 'soft_delete_cascade'
+      })
     }
 
     // Single delete
-    const result = await properties.deleteOne({ _id: new ObjectId(id) })
-    if (result.deletedCount === 0) {
-      return NextResponse.json({ success: false, error: 'Property not found' }, { status: 404 })
+    const { softDeletePropertyCascade } = await import('@/lib/services/propertyService')
+    const result = await softDeletePropertyCascade(id)
+    if (!result.ok) {
+      return NextResponse.json({ success: false, error: result.error || 'Property not found' }, { status: 404 })
     }
-
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ 
+      success: true, 
+      leads_unmatched: result.leads_unmatched,
+      mode: 'soft_delete_cascade'
+    })
   } catch (error) {
     const authResponse = authErrorResponse(error)
     if (authResponse) return authResponse

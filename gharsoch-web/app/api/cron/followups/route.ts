@@ -99,7 +99,7 @@ async function handleFollowupsCron(request: NextRequest) {
 
       // Fetch full property for location context
       const inheritedProperty = inheritedPropertyId
-        ? await propsCol.findOne({ _id: new ObjectId(inheritedPropertyId.toString()) })
+        ? await propsCol.findOne({ _id: new ObjectId(inheritedPropertyId.toString()), is_deleted: { $ne: true } })
         : null
 
       const res = await triggerCallbackCall({

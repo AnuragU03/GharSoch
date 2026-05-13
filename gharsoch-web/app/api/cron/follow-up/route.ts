@@ -139,7 +139,7 @@ async function handleFollowupCron(request: NextRequest) {
 
           // Fetch full property for location context
           const inheritedProperty = inheritedPropertyId
-            ? await propsCol.findOne({ _id: new ObjectId(inheritedPropertyId.toString()) })
+            ? await propsCol.findOne({ _id: new ObjectId(inheritedPropertyId.toString()), is_deleted: { $ne: true } })
             : null
 
           const result = await ctx.vapi.triggerCallbackCall({
