@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_WEBAPP_NAME: gharsoc-app-primary
+  AZURE_WEBAPP_NAME: gharsoc-app-primary-v2
   NODE_VERSION: '20.x'
   PROJECT_PATH: 'gharsoch-web'
 
@@ -95,7 +95,7 @@ jobs:
           curl -fsS -X DELETE -H "Authorization: Basic $KUDU_AUTH" "https://${{ env.AZURE_WEBAPP_NAME }}.scm.azurewebsites.net/api/vfs/site/wwwroot/?recursive=true" || true
           echo "wwwroot cleaned"
         env:
-          PUBLISH_PROFILE: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_7B6B0D5B6B4B4B4B }}
+          PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_V2 }}
 
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
@@ -103,5 +103,5 @@ jobs:
         with:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
           slot-name: 'Production'
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_7B6B0D5B6B4B4B4B }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_V2 }}
           package: deploy.zip
