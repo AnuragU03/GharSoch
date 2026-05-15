@@ -150,3 +150,11 @@ scripts/bulk_upload_leads.js
 
 # ─── Data folder (seed/test JSON — not for git) ────────────────────────────────
 data/
+
+# Azure Migration Secrets
+appsettings.json
+appsettings_final.json
+functionsettings.json
+*.xml
+*.zip
+
