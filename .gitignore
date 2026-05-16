@@ -158,3 +158,32 @@ functionsettings.json
 *.xml
 *.zip
 
+scratch/
+
+node_modules/
+gharsoch-web/node_modules/
+
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# === Added during V2 migration cleanup ===
+# Scratch / experiments (never commit)
+**/scratch/
+
+# Azure migration artifacts
+*.PublishSettings
+*-publish-profile.xml
+appsettings*.json
+v2-logs*.zip
+v2-logs/
+resources.txt
+
+# Env backups
+.env.backup-*
+**/.env.backup-*
+
+# Stray builds
+**/.next/standalone/.env
